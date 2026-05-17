@@ -65,12 +65,14 @@ function LoginPage() {
   async function handleGoogle() {
     setLoading(true);
     try {
+      const dest = invite ? `/onboarding?invite=${invite}` : "/choose";
       const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: `${window.location.origin}/onboarding${invite ? `?invite=${invite}` : ""}`,
+        redirect_uri: `${window.location.origin}${dest}`,
       });
       if (result.error) throw new Error(result.error.message ?? "Google sign-in failed");
       if (result.redirected) return;
-      navigate({ to: "/onboarding", search: { invite } });
+      if (invite) navigate({ to: "/onboarding", search: { invite } });
+      else navigate({ to: "/choose" });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Google sign-in failed");
       setLoading(false);
