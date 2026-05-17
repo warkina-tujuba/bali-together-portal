@@ -1,74 +1,152 @@
 ## Goal
 
-End-to-end host journey: sign up with Google → pick avatar → choose **Create a trip** or **Join with a magic link** → if creating, build the trip (name, occasion, destination, dates), add your own flight + stay (with house pin on map), let AI draft the days, add events, then publish a Magic Link to invite the crew.
+Fix the four pain points in order: (1) booking UX, (2) replace AI itinerary chat with a structured questionnaire + manual "+" event builder, (3) events feed + chat on dashboard, (4) invitee onboarding → RSVP agenda. Default trip is the Bali trip — invitees inherit the host's locked events and confirm attendance.
 
-Today the app assumes one admin-created trip and invite-only joining. We're turning every user into a potential host.
+**Token-saving directive**: no AI calls anywhere in the new flows. Flight lookup uses a real flight API (booking-ref autocomplete). Stay = paste address → geocode → pin. Itinerary = pick chips + recommendations, no LLM.
 
-## Flow
+---
+
+## 1. Booking UX overhaul
+
+### Flights — "by flight number" first
 
 ```
-Login (Google / email)
-   │
-   ├─ has invite token in URL?  ──► Join flow (existing): accept invite → onboarding → dashboard
-   │
-   └─ no invite ──► /choose
-                      ├─ "Create a trip"  → /trip/new (multi-step wizard)
-                      └─ "Join with a code" → paste token → join flow
+[Flight number]  [Date]   →  Look up
+   AA123         2026-06-20
 ```
 
-### Create-a-trip wizard (`/trip/new`)
+- New `lookupFlight({ flight_number, date })` server fn calls a flight-data API and returns airline, route, scheduled times.
+- Recommended API: **AeroDataBox via RapidAPI** (cheap pay-per-call, no AI tokens). Free tier covers testing.
+- Falls back to manual form if API fails or returns nothing.
+- "Have a booking ref instead?" link → small text field; we look up via the same provider's PNR endpoint when available, else collapse to manual.
+- Removes paste-email-blob flow entirely (it relied on LLM).
 
-Single route, 5 short steps, progress bar, save-as-you-go.
+**Action needed from you:** sign up at rapidapi.com → subscribe to AeroDataBox (free) → I'll request `AERODATABOX_RAPIDAPI_KEY` via the secret tool. If you'd rather use a different provider, name it.
 
-1. **Trip basics** — name, occasion (Birthday / Bachelorette / Honeymoon / Reunion / Just because — chips), destination (geocoded), start + end dates, optional description. Creates the `trips` row, links host's `profiles.trip_id`, grants host the `admin` role.
-2. **Your hero** — avatar picker (Marvel / DC / Pokémon) + full name. Reuses existing `AvatarPicker`.
-3. **Your flight** — paste-booking-first (existing `FlightPasteForm`), manual fallback. Optional ("Skip — I'll add later").
-4. **Your stay** — paste-booking-first (existing `StayPasteForm`), search fallback. Auto-geocoded → becomes a house-icon pin on the trip map. Optional.
-5. **Plan & invite** — "Draft my days with AI" button calls `suggestItinerary`, shows day cards, host can **Add event** to any day (inline form: title, time, location). Then **Publish & copy Magic Link** generates the invite token and copies `https://…/?invite=TOKEN` to clipboard.
+### Stays — paste address is primary
 
-After publish → `/dashboard`.
+- Single tab: **Paste address or booking link**.
+- Geocode via Mapbox (token already in project).
+- Show preview card + draggable pin to fine-tune location.
+- Save → pin appears on map with a clear **house icon** (already done) and distinct color per stay type if we add hotel/villa/apartment dropdown.
+- Remove the AI booking-parser code path.
 
-### Map house pin
+### Map pin clarity
 
-Replace the generic green dot for stays in `/map` with a house emoji marker on a white circle so accommodations read differently from live-location avatars.
+- Stays: 🏠 white circle, orange border (existing).
+- Events: 📍 colored circle by category (food / activity / transit).
+- Live members: avatar with green ring (existing).
+- Add a small legend in the top-left of the map.
 
-## Backend changes
+---
 
-New server functions in `src/lib/trip.functions.ts`:
+## 2. Structured itinerary planner (no AI)
 
-- `createTrip({ name, occasion, destination, lat, lng, start_date, end_date, description })` — inserts trip, sets caller as `admin` in `user_roles`, sets `profiles.trip_id`.
-- `createMagicLink({ full_name?, email?, max_uses? })` — host-only (checks admin); returns `{ token, url }`. Loosen current admin-only `adminCreateInvite` by adding this host-scoped variant that uses caller's `trip_id` instead of the single `is_active` trip.
-- `addActivity({ day_date, title, start_time?, location?, description? })` — inserts into `activities`, host-only on their trip.
-- `saveItineraryDays({ days: [{date,title,summary?}] })` — persists AI-drafted days into `itinerary_days` so they survive reload.
+Replace "Draft my days with AI" with a **trip preferences questionnaire** that fills the days deterministically from a curated Bali catalogue.
 
-DB migration:
-- `invites`: add `max_uses int default 1`, `uses_count int default 0`. Tweak `acceptInvite` to check `uses_count < max_uses` instead of single-use `used_at`. Keep `used_at` for backwards compat.
-- `activities`: add RLS policy `Trip admins manage activities` (currently only global admin can write).
-- `itinerary_days`: same — trip admins can write their own trip's days.
-- `trips`: allow authenticated insert (with check that caller becomes admin via app logic).
+### Questionnaire (5 quick steps)
+
+1. **Vibe** — chips: Adventure / Relaxed / Cultural / Foodie / Party (multi-select)
+2. **Pace** — slider: Chill (1 event/day) ↔ Packed (4+ events/day)
+3. **Must-do** — chips: Beach, Surf, Rice terraces, Temples, Spa, Nightlife, Diving, Yoga
+4. **Avoid** — chips: Early starts, Long drives, Crowds
+5. **Budget per activity** — slider $ / $$ / $$$
+
+### Output
+
+- We ship a hand-curated **Bali activity catalogue** (~40 entries) as a static JSON file (`src/data/bali-activities.ts`) with: title, location (lat/lng), tags, category, vibe, intensity, est. cost, image URL, duration.
+- Pure-JS scoring function picks N activities per day matching their answers, slots them by time (morning/afternoon/evening), respects pace.
+- Result renders as editable day cards.
+
+### Manual "+" event builder
+
+- Big **"+ Add event"** button on each day card.
+- Form: title, day, time, location (Mapbox search), category, optional image upload, notes.
+- For locations: same paste-address search as stays.
+- **Image**: pick from category-matched stock images (already in catalogue) OR upload custom (Supabase Storage bucket `event-images`).
+- Saves to `activities` table with the new fields.
+
+---
+
+## 3. Dashboard: events + chat
+
+- New **"Upcoming events" feed** at top of `/dashboard` (next 3 events from the host's locked itinerary, with image, time, location, RSVP count).
+- **Chat shortcut** card: "Group chat (4 unread)" → links to `/chat`.
+- Existing trip summary moves below.
+
+---
+
+## 4. Invitee flow & RSVP
+
+### Default trip = Bali
+
+- New users invited via Magic Link auto-join the host's Bali trip (already works via `acceptInvite`).
+- After accepting → forced onboarding wizard (their flight + stay) → land on **`/agenda`**.
+
+### `/agenda` (new route)
+
+- Lists every host-locked event in chronological order.
+- Each event shows: image, title, time, location, host avatar.
+- Three RSVP buttons per event: ✅ Going / 🤔 Maybe / ❌ Can't make it.
+- Top progress: "5 of 12 events confirmed".
+- Once all RSVP'd → "Continue to dashboard" CTA.
+
+### RSVP backend
+
+- New table `event_rsvps` (`activity_id`, `user_id`, `status`, `responded_at`).
+- RLS: trip members read all RSVPs for their trip's events; users write only own.
+- Event cards everywhere show attendance counts ("8 going").
+
+---
 
 ## Files
 
 **New**
-- `src/routes/choose.tsx` — post-login fork (Create vs Join)
-- `src/routes/_authenticated/trip.new.tsx` — wizard
-- `src/components/trip/EventForm.tsx` — inline add-event form
-- `src/components/trip/OccasionPicker.tsx` — chip selector
-- `supabase/migrations/<ts>_host_flow.sql`
+- `src/lib/flight-api.server.ts` — AeroDataBox client
+- `src/lib/flight.functions.ts` — `lookupFlight` server fn
+- `src/data/bali-activities.ts` — curated catalogue
+- `src/lib/itinerary-planner.ts` — scoring + slotting (pure JS)
+- `src/components/trip/FlightLookupForm.tsx` — number+date lookup UI
+- `src/components/trip/StayAddressForm.tsx` — paste-address + Mapbox geocode + pin tuner
+- `src/components/trip/PreferencesQuiz.tsx` — 5-step chip/slider questionnaire
+- `src/components/trip/EventBuilder.tsx` — manual "+" form (replaces current minimal EventForm)
+- `src/components/trip/EventCard.tsx` — shared card w/ RSVP
+- `src/components/dashboard/UpcomingEvents.tsx`
+- `src/components/dashboard/ChatPreview.tsx`
+- `src/routes/_authenticated/agenda.tsx`
+- `supabase/migrations/<ts>_rsvps_and_event_fields.sql`
 
 **Edited**
-- `src/lib/trip.functions.ts` — add `createTrip`, `createMagicLink`, `addActivity`, `saveItineraryDays`; relax `acceptInvite` for multi-use tokens
-- `src/routes/login.tsx` — redirect to `/choose` (not `/onboarding`) when no invite
-- `src/routes/_authenticated/onboarding.tsx` — keep for joiners; if profile has no `trip_id`, redirect to `/choose`
-- `src/routes/_authenticated/dashboard.tsx` — surface "Copy magic link" button for hosts (replaces send-magic-link CTA)
-- `src/routes/_authenticated/map.tsx` — house emoji markers for stays
-- `src/routes/_authenticated.tsx` — add "New trip" entry in top nav for signed-in users without a trip
+- `src/lib/trip.functions.ts` — `lookupFlight` removed (moved), new `setRsvp`, `listAgenda`, `getEventCatalogue`, `applyPreferences`; AI-itinerary fn deleted or stubbed
+- `src/components/trip/FlightPasteForm.tsx` — deleted
+- `src/components/trip/StayPasteForm.tsx` — deleted
+- `src/routes/_authenticated/trip.new.tsx` — wizard step 3 uses `FlightLookupForm`, step 4 uses `StayAddressForm`, step 5 uses `PreferencesQuiz`
+- `src/routes/_authenticated/onboarding.tsx` — joiner flow ends on `/agenda`
+- `src/routes/_authenticated/dashboard.tsx` — adds `UpcomingEvents` + `ChatPreview` at top
+- `src/routes/_authenticated/itinerary.tsx` — adds "+ Add event" per day, RSVP counts
+- `src/routes/_authenticated/map.tsx` — event pins + legend
+
+---
+
+## Suggested ship order (separate PRs so you can test each)
+
+1. **Booking UX** — flight lookup + stay address (needs your RapidAPI key)
+2. **Structured planner + "+" events** — replaces AI itinerary
+3. **Dashboard events feed + chat shortcut**
+4. **RSVP + invitee `/agenda`**
+
+---
 
 ## Out of scope (this pass)
 
-- Multi-trip per user (still one trip per profile via `profiles.trip_id`)
 - Editing trip basics after creation
-- Event editing/deletion UI (only add)
-- Email-send of magic link (copy-to-clipboard only — matches your "copy and paste anywhere" requirement)
+- Event editing/deletion UI (still add-only; delete via admin)
+- Push notifications for RSVPs
+- Hotel rate lookups
+- Real boarding-pass scan
 
-Approve to ship.
+---
+
+## One blocker before I start
+
+To wire flight number → details, I need a flight data API key. **AeroDataBox via RapidAPI** is the cheapest fit (free tier, no AI tokens). Want me to proceed with that and prompt you for the key, or do you have a different provider in mind?
