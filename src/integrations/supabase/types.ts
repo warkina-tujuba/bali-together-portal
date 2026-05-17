@@ -23,6 +23,7 @@ export type Database = {
           check_out: string | null
           created_at: string
           id: string
+          kind: Database["public"]["Enums"]["stay_kind"]
           lat: number | null
           lng: number | null
           name: string
@@ -40,6 +41,7 @@ export type Database = {
           check_out?: string | null
           created_at?: string
           id?: string
+          kind?: Database["public"]["Enums"]["stay_kind"]
           lat?: number | null
           lng?: number | null
           name: string
@@ -57,6 +59,7 @@ export type Database = {
           check_out?: string | null
           created_at?: string
           id?: string
+          kind?: Database["public"]["Enums"]["stay_kind"]
           lat?: number | null
           lng?: number | null
           name?: string
@@ -78,11 +81,18 @@ export type Database = {
       }
       activities: {
         Row: {
+          category: Database["public"]["Enums"]["event_category"]
           cover_image_url: string | null
           created_at: string
+          created_by: string | null
           day_date: string
           description: string | null
+          duration_min: number | null
+          end_time: string | null
           id: string
+          image_url: string | null
+          lat: number | null
+          lng: number | null
           location: string | null
           sort_index: number
           start_time: string | null
@@ -91,11 +101,18 @@ export type Database = {
           trip_id: string
         }
         Insert: {
+          category?: Database["public"]["Enums"]["event_category"]
           cover_image_url?: string | null
           created_at?: string
+          created_by?: string | null
           day_date: string
           description?: string | null
+          duration_min?: number | null
+          end_time?: string | null
           id?: string
+          image_url?: string | null
+          lat?: number | null
+          lng?: number | null
           location?: string | null
           sort_index?: number
           start_time?: string | null
@@ -104,11 +121,18 @@ export type Database = {
           trip_id: string
         }
         Update: {
+          category?: Database["public"]["Enums"]["event_category"]
           cover_image_url?: string | null
           created_at?: string
+          created_by?: string | null
           day_date?: string
           description?: string | null
+          duration_min?: number | null
+          end_time?: string | null
           id?: string
+          image_url?: string | null
+          lat?: number | null
+          lng?: number | null
           location?: string | null
           sort_index?: number
           start_time?: string | null
@@ -122,6 +146,44 @@ export type Database = {
             columns: ["trip_id"]
             isOneToOne: false
             referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_rsvps: {
+        Row: {
+          activity_id: string
+          created_at: string
+          id: string
+          status: Database["public"]["Enums"]["rsvp_status"]
+          trip_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          activity_id: string
+          created_at?: string
+          id?: string
+          status?: Database["public"]["Enums"]["rsvp_status"]
+          trip_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          activity_id?: string
+          created_at?: string
+          id?: string
+          status?: Database["public"]["Enums"]["rsvp_status"]
+          trip_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_rsvps_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "activities"
             referencedColumns: ["id"]
           },
         ]
@@ -398,6 +460,42 @@ export type Database = {
           },
         ]
       }
+      trip_preferences: {
+        Row: {
+          avoid: string[]
+          budget: number
+          created_at: string
+          created_by: string
+          must_do: string[]
+          pace: number
+          trip_id: string
+          updated_at: string
+          vibes: string[]
+        }
+        Insert: {
+          avoid?: string[]
+          budget?: number
+          created_at?: string
+          created_by: string
+          must_do?: string[]
+          pace?: number
+          trip_id: string
+          updated_at?: string
+          vibes?: string[]
+        }
+        Update: {
+          avoid?: string[]
+          budget?: number
+          created_at?: string
+          created_by?: string
+          must_do?: string[]
+          pace?: number
+          trip_id?: string
+          updated_at?: string
+          vibes?: string[]
+        }
+        Relationships: []
+      }
       trips: {
         Row: {
           cover_image_url: string | null
@@ -490,6 +588,16 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "guest"
+      event_category:
+        | "food"
+        | "activity"
+        | "culture"
+        | "nightlife"
+        | "transit"
+        | "chill"
+        | "other"
+      rsvp_status: "going" | "maybe" | "declined"
+      stay_kind: "hotel" | "villa" | "apartment" | "hostel" | "resort" | "other"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -618,6 +726,17 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "guest"],
+      event_category: [
+        "food",
+        "activity",
+        "culture",
+        "nightlife",
+        "transit",
+        "chill",
+        "other",
+      ],
+      rsvp_status: ["going", "maybe", "declined"],
+      stay_kind: ["hotel", "villa", "apartment", "hostel", "resort", "other"],
     },
   },
 } as const
