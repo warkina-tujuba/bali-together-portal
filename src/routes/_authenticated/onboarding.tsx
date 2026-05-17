@@ -104,21 +104,14 @@ function Onboarding() {
         <Card className="rounded-3xl border-0 p-7 shadow-card">
           <h2 className="font-display text-3xl">Your arrival flight</h2>
           <p className="mt-2 text-sm text-muted-foreground">So the crew can see everyone landing on one board.</p>
-          <Tabs defaultValue="paste" className="mt-5">
-            <TabsList className="grid w-full grid-cols-2 rounded-xl">
-              <TabsTrigger value="paste" className="rounded-lg">Paste booking</TabsTrigger>
-              <TabsTrigger value="manual" className="rounded-lg">Add manually</TabsTrigger>
-            </TabsList>
-            <TabsContent value="paste" className="mt-4">
-              <FlightPasteForm
-                parse={parseFlight}
-                onSave={async (f) => { await flightFn({ data: f }); await advance(3); }}
-              />
-            </TabsContent>
-            <TabsContent value="manual" className="mt-4">
-              <FlightManualForm onSave={async (f) => { await flightFn({ data: f }); await advance(3); }} />
-            </TabsContent>
-          </Tabs>
+          <div className="mt-5">
+            <FlightSmartForm
+              defaultDate={data?.trip?.start_date ?? null}
+              onSaved={async () => { await advance(3); }}
+              ctaLabel="Save & continue"
+            />
+            <button onClick={() => advance(3)} className="mt-3 w-full text-center text-xs text-muted-foreground">Skip for now →</button>
+          </div>
         </Card>
       )}
 
