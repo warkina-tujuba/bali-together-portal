@@ -122,6 +122,22 @@ function Dashboard() {
         />
       )}
 
+      {/* Events + chat tiles */}
+      <div className="mt-5 grid gap-4 sm:grid-cols-2">
+        <UpcomingEvents
+          events={(agenda?.events ?? []).map((e) => ({
+            id: e.id, title: e.title, day_date: e.day_date,
+            start_time: e.start_time, image_url: e.image_url,
+          }))}
+          rsvps={agenda?.rsvps ?? {}}
+        />
+        <ChatPreview
+          memberCount={data.members.length}
+          lastMessage={msgs?.messages?.at(-1)?.body ?? null}
+          lastFrom={data.members.find((m) => m.id === msgs?.messages?.at(-1)?.user_id)?.full_name ?? null}
+        />
+      </div>
+
       <div className="mt-5 grid gap-5 lg:grid-cols-3">
         {/* Profile checklist */}
         <Card className="rounded-3xl border-0 p-6 shadow-soft lg:col-span-2">
