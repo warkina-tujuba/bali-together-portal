@@ -1,16 +1,18 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { getDashboard, suggestItinerary, updateProfile, isAdmin as isAdminFn, createMagicLink } from "@/lib/trip.functions";
+import { getDashboard, updateProfile, isAdmin as isAdminFn, createMagicLink, listAgenda, listMessages } from "@/lib/trip.functions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Plane, Home, MessageCircle, Sparkles, Send, CheckCircle2, AlertCircle, Users, Copy, Check } from "lucide-react";
+import { Plane, Home, MessageCircle, Send, CheckCircle2, AlertCircle, Users, Copy, Check, Sparkles } from "lucide-react";
 import { FlightDialog } from "@/components/trip/FlightDialog";
 import { StayDialog } from "@/components/trip/StayDialog";
 import { airlineLogoUrl, parseAirlineCode } from "@/lib/airline";
 import { bookingSourceMeta } from "@/lib/booking-source";
+import { UpcomingEvents } from "@/components/dashboard/UpcomingEvents";
+import { ChatPreview } from "@/components/dashboard/ChatPreview";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({ component: Dashboard });
 
