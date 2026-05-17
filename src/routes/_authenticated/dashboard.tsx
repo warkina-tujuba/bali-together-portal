@@ -168,7 +168,7 @@ function Dashboard() {
 
   const trip = data.trip;
   const center: [number, number] = [trip.map_center_lng ?? 115.0875, trip.map_center_lat ?? -8.829];
-  const myFlight = (data as { flights?: { user_id: string }[] }).flights?.find?.((f) => f.user_id === data.userId);
+  const myFlight = data.flights?.find((f: { user_id: string }) => f.user_id === data.userId);
   const myStay = data.stays.find((s: { user_id: string }) => s.user_id === data.userId);
 
   return (
