@@ -201,20 +201,29 @@ function Dashboard() {
             </div>
           )}
 
-          {/* Ready to send */}
-          <div className={`mt-6 rounded-2xl p-4 ${allReady ? "bg-primary/10" : "bg-secondary"}`}>
-            <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
-              <div>
-                <p className="font-display text-lg">{allReady ? "You're ready to send the magic link" : "Almost ready"}</p>
-                <p className="text-sm text-muted-foreground">{allReady ? "Invite the crew with one tap." : "Finish the checklist above to unlock."}</p>
-              </div>
-              <Link to={isAdmin ? "/admin" : "/chat"}>
-                <Button disabled={!allReady} className="h-11 rounded-xl px-5">
-                  <Send className="mr-2 h-4 w-4" />{isAdmin ? "Send magic link" : "Open chat"}
+          {/* Magic link */}
+          {isAdmin && (
+            <div className={`mt-6 rounded-2xl p-4 ${allReady ? "bg-primary/10" : "bg-secondary"}`}>
+              <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+                <div>
+                  <p className="font-display text-lg">Invite the crew</p>
+                  <p className="text-sm text-muted-foreground">One magic link — copy and paste anywhere.</p>
+                </div>
+                <Button onClick={copyMagic} className="h-11 rounded-xl px-5">
+                  {copied ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}{copied ? "Copied" : "Copy magic link"}
                 </Button>
-              </Link>
+              </div>
+              {magicUrl && <div className="mt-3 break-all rounded-xl bg-background p-3 font-mono text-xs">{magicUrl}</div>}
             </div>
-          </div>
+          )}
+          {!isAdmin && (
+            <div className="mt-6 rounded-2xl bg-secondary p-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm text-muted-foreground">{allReady ? "All set — say hi in the group chat." : "Finish the checklist above to unlock."}</p>
+                <Link to="/chat"><Button disabled={!allReady} className="h-11 rounded-xl px-5"><Send className="mr-2 h-4 w-4" />Open chat</Button></Link>
+              </div>
+            </div>
+          )}
         </Card>
 
         {/* Crew */}
