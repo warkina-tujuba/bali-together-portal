@@ -172,34 +172,16 @@ function Dashboard() {
                 cta="Open"
               />
             </Link>
-            <button className="w-full text-left" onClick={() => aiMut.mutate()} disabled={aiMut.isPending}>
+            <Link to="/itinerary" className="w-full text-left">
               <StatusTile
                 icon={<Sparkles className="h-5 w-5" />}
-                title="AI itinerary"
-                status={aiDays ? `${aiDays.length} days drafted` : "Tap to generate"}
-                done={!!aiDays}
-                cta={aiMut.isPending ? "Thinking…" : (aiDays ? "Regenerate" : "Generate")}
+                title="The plan"
+                status={isAdmin ? "Tune prefs · add events" : "View & RSVP"}
+                done={false}
+                cta="Open"
               />
-            </button>
+            </Link>
           </div>
-
-          {/* AI output */}
-          {aiDays && aiDays.length > 0 && (
-            <div className="mt-6 space-y-3">
-              <h3 className="font-display text-xl">Suggested plan</h3>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {aiDays.map((d) => (
-                  <div key={d.date} className="rounded-2xl bg-secondary p-4">
-                    <p className="text-xs uppercase tracking-wider text-muted-foreground">{new Date(d.date).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</p>
-                    <p className="font-display text-lg">{d.title}</p>
-                    <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-                      {d.items.map((it, i) => <li key={i}>• {it}</li>)}
-                    </ul>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Magic link */}
           {isAdmin && (
