@@ -119,7 +119,8 @@ function Dashboard() {
   const mapPins = useMemo(() => {
     if (!data) return [];
     const pins: { id: string; lat: number; lng: number; label: string; sub?: string; kind: "stay" | "activity" | "host" }[] = [];
-    data.stays.filter((s: { lat: number | null; lng: number | null }) => s.lat != null && s.lng != null).forEach((s: { id: string; lat: number; lng: number; name: string; address: string | null }) => {
+    data.stays.forEach((s) => {
+      if (s.lat == null || s.lng == null) return;
       pins.push({ id: `stay-${s.id}`, lat: s.lat, lng: s.lng, label: s.name, sub: s.address ?? undefined, kind: "stay" });
     });
     const dayActs = activitiesByDay.get(activeDay) ?? [];
