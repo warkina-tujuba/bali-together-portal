@@ -57,6 +57,7 @@ function BottomBar() {
     { to: "/dashboard", label: "Trip" },
     { to: "/map", label: "Map" },
     { to: "/itinerary", label: "Plan" },
+    { to: "/admin", label: "Host" },
   ] as const;
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 backdrop-blur">
