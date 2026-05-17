@@ -135,7 +135,7 @@ function Itinerary() {
                     }}
                     myStatus={(agenda?.rsvps[a.id] ?? null) as RsvpStatus}
                     counts={agenda?.counts[a.id] ?? { going: 0, maybe: 0, declined: 0 }}
-                    onRsvp={(status) => status && rsvpMut.mutate({ activity_id: a.id, status })}
+                    onRsvp={(status) => { if (status) rsvpMut.mutate({ activity_id: a.id, status }); }}
                     compact
                   />
                 ))}
