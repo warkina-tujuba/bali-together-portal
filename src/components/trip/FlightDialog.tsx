@@ -35,7 +35,10 @@ export function FlightDialog({
           initial={initial}
           defaultDate={defaultDate ?? null}
           onSaved={async () => {
-            await qc.invalidateQueries({ queryKey: ["dashboard"] });
+            await Promise.all([
+              qc.invalidateQueries({ queryKey: ["dashboard"] }),
+              qc.invalidateQueries({ queryKey: ["itineraryHome"] }),
+            ]);
             setOpen(false);
           }}
         />

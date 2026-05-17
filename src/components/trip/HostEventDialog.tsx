@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
 import { createHostEvent } from "@/lib/trip.functions";
@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Crown } from "lucide-react";
 
-export function HostEventDialog({ defaultDate, trigger }: { defaultDate: string; trigger?: React.ReactNode }) {
+export function HostEventDialog({ defaultDate, tripDays, trigger }: { defaultDate: string; tripDays?: string[]; trigger?: React.ReactNode }) {
   const create = useServerFn(createHostEvent);
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -22,6 +22,8 @@ export function HostEventDialog({ defaultDate, trigger }: { defaultDate: string;
   const [desc, setDesc] = useState("");
   const [bookingUrl, setBookingUrl] = useState("");
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => { setDate(defaultDate); }, [defaultDate]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -66,6 +68,27 @@ export function HostEventDialog({ defaultDate, trigger }: { defaultDate: string;
             <Label className="text-xs uppercase tracking-wider text-muted-foreground">Title</Label>
             <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Birthday dinner at La Brisa" className="mt-1 h-11 rounded-xl" />
           </div>
+          {tripDays && tripDays.length > 0 && (
+            <div>
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground">Day</Label>
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {tripDays.map((d) => {
+                  const dt = new Date(d);
+                  const active = d === date;
+                  return (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setDate(d)}
+                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${active ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:bg-secondary"}`}
+                    >
+                      {dt.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-3 gap-2">
             <div>
               <Label className="text-xs">Date</Label>
