@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { z } from "zod";
+import { planTrip, buildDaySummaries } from "@/lib/itinerary-planner";
 
 // ---- Public: accept invite token ----
 export const acceptInvite = createServerFn({ method: "POST" })
@@ -555,4 +556,190 @@ export const saveItineraryDays = createServerFn({ method: "POST" })
     const { error } = await supabaseAdmin.from("itinerary_days").insert(rows);
     if (error) throw new Error(error.message);
     return { ok: true };
+  });
+
+// ============================================================
+// Flight lookup via AviationStack (no AI tokens)
+// ============================================================
+export const lookupFlight = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({
+    flight_number: z.string().min(3).max(10).regex(/^[A-Za-z0-9]{2,3}\s*\d{1,4}[A-Za-z]?$/),
+    date: z.string().min(8).max(20).optional().nullable(),
+  }))
+  .handler(async ({ data }) => {
+    const key = process.env.AVIATIONSTACK_API_KEY;
+    if (!key) throw new Error("Flight lookup not configured");
+    const fnum = data.flight_number.replace(/\s+/g, "").toUpperCase();
+    const url = new URL("http://api.aviationstack.com/v1/flights");
+    url.searchParams.set("access_key", key);
+    url.searchParams.set("flight_iata", fnum);
+    if (data.date) url.searchParams.set("flight_date", data.date);
+    url.searchParams.set("limit", "1");
+    const res = await fetch(url.toString());
+    if (!res.ok) throw new Error(`Lookup failed (${res.status})`);
+    const json = (await res.json()) as { data?: Array<Record<string, unknown>> };
+    const f = json.data?.[0] as
+      | undefined
+      | {
+          airline?: { name?: string; iata?: string };
+          flight?: { iata?: string; number?: string };
+          departure?: { iata?: string; airport?: string; scheduled?: string };
+          arrival?: { iata?: string; airport?: string; scheduled?: string };
+          flight_status?: string;
+        };
+    if (!f) return { found: false as const };
+    return {
+      found: true as const,
+      airline: f.airline?.name ?? null,
+      airline_iata: f.airline?.iata ?? null,
+      flight_number: f.flight?.iata ?? fnum,
+      scheduled_at: f.arrival?.scheduled ?? f.departure?.scheduled ?? null,
+      origin_iata: f.departure?.iata ?? null,
+      origin_city: f.departure?.airport ?? null,
+      destination_iata: f.arrival?.iata ?? null,
+      destination_city: f.arrival?.airport ?? null,
+      status: f.flight_status ?? null,
+    };
+  });
+
+// ============================================================
+// Events: rich add + RSVPs + agenda
+// ============================================================
+export const addEvent = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({
+    day_date: z.string().min(8).max(20),
+    title: z.string().min(1).max(200),
+    start_time: z.string().max(10).optional().nullable(),
+    end_time: z.string().max(10).optional().nullable(),
+    location: z.string().max(200).optional().nullable(),
+    description: z.string().max(2000).optional().nullable(),
+    category: z.enum(["food", "activity", "culture", "nightlife", "chill", "transit", "other"]).default("activity"),
+    image_url: z.string().max(2000).optional().nullable(),
+    lat: z.number().min(-90).max(90).optional().nullable(),
+    lng: z.number().min(-180).max(180).optional().nullable(),
+  }))
+  .handler(async ({ data, context }) => {
+    const { userId } = context;
+    const { data: profile } = await supabaseAdmin.from("profiles").select("trip_id").eq("id", userId).maybeSingle();
+    if (!profile?.trip_id) throw new Error("Join a trip first");
+    const { error } = await supabaseAdmin.from("activities").insert({
+      ...data,
+      trip_id: profile.trip_id,
+      created_by: userId,
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const setRsvp = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({
+    activity_id: z.string().uuid(),
+    status: z.enum(["going", "maybe", "declined"]),
+  }))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: profile } = await supabase.from("profiles").select("trip_id").eq("id", userId).maybeSingle();
+    if (!profile?.trip_id) throw new Error("No trip");
+    const { data: existing } = await supabase.from("event_rsvps").select("id").eq("activity_id", data.activity_id).eq("user_id", userId).maybeSingle();
+    if (existing) {
+      const { error } = await supabase.from("event_rsvps").update({ status: data.status }).eq("id", existing.id);
+      if (error) throw new Error(error.message);
+    } else {
+      const { error } = await supabase.from("event_rsvps").insert({
+        activity_id: data.activity_id,
+        user_id: userId,
+        trip_id: profile.trip_id,
+        status: data.status,
+      });
+      if (error) throw new Error(error.message);
+    }
+    return { ok: true };
+  });
+
+export const listAgenda = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const { data: profile } = await supabase.from("profiles").select("trip_id").eq("id", userId).maybeSingle();
+    if (!profile?.trip_id) return { events: [], rsvps: {} as Record<string, "going" | "maybe" | "declined">, counts: {} as Record<string, { going: number; maybe: number; declined: number }> };
+    const [{ data: events }, { data: rsvps }] = await Promise.all([
+      supabase.from("activities").select("*").eq("trip_id", profile.trip_id).order("day_date").order("start_time", { ascending: true, nullsFirst: true }),
+      supabase.from("event_rsvps").select("*").eq("trip_id", profile.trip_id),
+    ]);
+    const myRsvps: Record<string, "going" | "maybe" | "declined"> = {};
+    const counts: Record<string, { going: number; maybe: number; declined: number }> = {};
+    for (const r of rsvps ?? []) {
+      if (r.user_id === userId) myRsvps[r.activity_id] = r.status as "going" | "maybe" | "declined";
+      const c = counts[r.activity_id] ?? { going: 0, maybe: 0, declined: 0 };
+      c[r.status as "going" | "maybe" | "declined"]++;
+      counts[r.activity_id] = c;
+    }
+    return { events: events ?? [], rsvps: myRsvps, counts };
+  });
+
+// ============================================================
+// Apply preferences → deterministic Bali plan (no AI tokens)
+// ============================================================
+export const applyPreferences = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({
+    vibes: z.array(z.string().max(40)).max(20),
+    must_do: z.array(z.string().max(40)).max(20),
+    avoid: z.array(z.string().max(40)).max(20),
+    pace: z.number().int().min(1).max(5),
+    budget: z.number().int().min(1).max(3),
+  }))
+  .handler(async ({ data, context }) => {
+    const { userId } = context;
+    const { data: profile } = await supabaseAdmin.from("profiles").select("trip_id").eq("id", userId).maybeSingle();
+    if (!profile?.trip_id) throw new Error("No trip");
+    const { data: role } = await supabaseAdmin.from("user_roles").select("role").eq("user_id", userId).eq("role", "admin").maybeSingle();
+    if (!role) throw new Error("Host only");
+    const { data: trip } = await supabaseAdmin.from("trips").select("start_date,end_date").eq("id", profile.trip_id).maybeSingle();
+    if (!trip) throw new Error("No trip");
+
+    const tripId = profile.trip_id;
+    // Save preferences (delete-then-insert to avoid unique constraint requirement)
+    await supabaseAdmin.from("trip_preferences").delete().eq("trip_id", tripId);
+    await supabaseAdmin.from("trip_preferences").insert({
+      trip_id: tripId,
+      created_by: userId,
+      vibes: data.vibes,
+      must_do: data.must_do,
+      avoid: data.avoid,
+      pace: data.pace,
+      budget: data.budget,
+    });
+
+    const events = planTrip(trip.start_date, trip.end_date, data);
+    const days = buildDaySummaries(events);
+
+    await supabaseAdmin.from("activities").delete().eq("trip_id", tripId);
+    await supabaseAdmin.from("itinerary_days").delete().eq("trip_id", tripId);
+    if (days.length > 0) {
+      await supabaseAdmin.from("itinerary_days").insert(days.map((d, i) => ({
+        trip_id: tripId, day_date: d.date, title: d.title, summary: d.summary, sort_index: i,
+      })));
+    }
+    if (events.length > 0) {
+      await supabaseAdmin.from("activities").insert(events.map((e, i) => ({
+        trip_id: tripId, day_date: e.day_date, title: e.title, description: e.description,
+        location: e.location, start_time: e.start_time, end_time: e.end_time, duration_min: e.duration_min,
+        lat: e.lat, lng: e.lng, category: e.category, image_url: e.image_url, sort_index: i, created_by: userId,
+      })));
+    }
+    return { ok: true, days: days.length, events: events.length };
+  });
+
+export const getTripPreferences = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const { data: profile } = await supabase.from("profiles").select("trip_id").eq("id", userId).maybeSingle();
+    if (!profile?.trip_id) return { prefs: null };
+    const { data } = await supabase.from("trip_preferences").select("*").eq("trip_id", profile.trip_id).maybeSingle();
+    return { prefs: data };
   });

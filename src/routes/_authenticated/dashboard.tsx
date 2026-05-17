@@ -1,37 +1,37 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { getDashboard, suggestItinerary, updateProfile, isAdmin as isAdminFn, createMagicLink } from "@/lib/trip.functions";
+import { getDashboard, updateProfile, isAdmin as isAdminFn, createMagicLink, listAgenda, listMessages } from "@/lib/trip.functions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Plane, Home, MessageCircle, Sparkles, Send, CheckCircle2, AlertCircle, Users, Copy, Check } from "lucide-react";
+import { Plane, Home, MessageCircle, Send, CheckCircle2, AlertCircle, Users, Copy, Check, Sparkles } from "lucide-react";
 import { FlightDialog } from "@/components/trip/FlightDialog";
 import { StayDialog } from "@/components/trip/StayDialog";
 import { airlineLogoUrl, parseAirlineCode } from "@/lib/airline";
 import { bookingSourceMeta } from "@/lib/booking-source";
+import { UpcomingEvents } from "@/components/dashboard/UpcomingEvents";
+import { ChatPreview } from "@/components/dashboard/ChatPreview";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({ component: Dashboard });
 
 function Dashboard() {
   const fn = useServerFn(getDashboard);
-  const aiFn = useServerFn(suggestItinerary);
   const updFn = useServerFn(updateProfile);
   const adminCheck = useServerFn(isAdminFn);
   const magicFn = useServerFn(createMagicLink);
+  const agendaFn = useServerFn(listAgenda);
+  const msgsFn = useServerFn(listMessages);
+  void updFn;
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["dashboard"], queryFn: () => fn() });
   const { data: adminData } = useQuery({ queryKey: ["isAdmin"], queryFn: () => adminCheck() });
-  const [aiDays, setAiDays] = useState<Array<{ date: string; title: string; items: string[] }> | null>(null);
+  const { data: agenda } = useQuery({ queryKey: ["agenda"], queryFn: () => agendaFn() });
+  const { data: msgs } = useQuery({ queryKey: ["messages"], queryFn: () => msgsFn() });
+  void qc;
   const [magicUrl, setMagicUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-
-  const aiMut = useMutation({
-    mutationFn: () => aiFn(),
-    onSuccess: (r) => { setAiDays(r.days); toast.success("Itinerary drafted"); },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "AI failed"),
-  });
 
   async function copyMagic() {
     try {
@@ -122,6 +122,22 @@ function Dashboard() {
         />
       )}
 
+      {/* Events + chat tiles */}
+      <div className="mt-5 grid gap-4 sm:grid-cols-2">
+        <UpcomingEvents
+          events={(agenda?.events ?? []).map((e) => ({
+            id: e.id, title: e.title, day_date: e.day_date,
+            start_time: e.start_time, image_url: e.image_url,
+          }))}
+          rsvps={agenda?.rsvps ?? {}}
+        />
+        <ChatPreview
+          memberCount={data.members.length}
+          lastMessage={msgs?.messages?.at(-1)?.body ?? null}
+          lastFrom={data.members.find((m) => m.id === msgs?.messages?.at(-1)?.user_id)?.full_name ?? null}
+        />
+      </div>
+
       <div className="mt-5 grid gap-5 lg:grid-cols-3">
         {/* Profile checklist */}
         <Card className="rounded-3xl border-0 p-6 shadow-soft lg:col-span-2">
@@ -172,34 +188,16 @@ function Dashboard() {
                 cta="Open"
               />
             </Link>
-            <button className="w-full text-left" onClick={() => aiMut.mutate()} disabled={aiMut.isPending}>
+            <Link to="/itinerary" className="w-full text-left">
               <StatusTile
                 icon={<Sparkles className="h-5 w-5" />}
-                title="AI itinerary"
-                status={aiDays ? `${aiDays.length} days drafted` : "Tap to generate"}
-                done={!!aiDays}
-                cta={aiMut.isPending ? "Thinking…" : (aiDays ? "Regenerate" : "Generate")}
+                title="The plan"
+                status={isAdmin ? "Tune prefs · add events" : "View & RSVP"}
+                done={false}
+                cta="Open"
               />
-            </button>
+            </Link>
           </div>
-
-          {/* AI output */}
-          {aiDays && aiDays.length > 0 && (
-            <div className="mt-6 space-y-3">
-              <h3 className="font-display text-xl">Suggested plan</h3>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {aiDays.map((d) => (
-                  <div key={d.date} className="rounded-2xl bg-secondary p-4">
-                    <p className="text-xs uppercase tracking-wider text-muted-foreground">{new Date(d.date).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</p>
-                    <p className="font-display text-lg">{d.title}</p>
-                    <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-                      {d.items.map((it, i) => <li key={i}>• {it}</li>)}
-                    </ul>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Magic link */}
           {isAdmin && (
