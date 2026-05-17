@@ -198,10 +198,12 @@ export type Database = {
           email: string | null
           full_name: string
           id: string
+          max_uses: number
           token: string
           trip_id: string
           used_at: string | null
           used_by: string | null
+          uses_count: number
         }
         Insert: {
           created_at?: string
@@ -209,10 +211,12 @@ export type Database = {
           email?: string | null
           full_name: string
           id?: string
+          max_uses?: number
           token: string
           trip_id: string
           used_at?: string | null
           used_by?: string | null
+          uses_count?: number
         }
         Update: {
           created_at?: string
@@ -220,10 +224,12 @@ export type Database = {
           email?: string | null
           full_name?: string
           id?: string
+          max_uses?: number
           token?: string
           trip_id?: string
           used_at?: string | null
           used_by?: string | null
+          uses_count?: number
         }
         Relationships: [
           {
@@ -480,6 +486,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_trip_admin: { Args: { _trip_id: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "guest"
