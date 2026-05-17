@@ -23,6 +23,8 @@ export function HostEventDialog({ defaultDate, tripDays, trigger }: { defaultDat
   const [bookingUrl, setBookingUrl] = useState("");
   const [busy, setBusy] = useState(false);
 
+  useEffect(() => { setDate(defaultDate); }, [defaultDate]);
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim() || !date) return;
