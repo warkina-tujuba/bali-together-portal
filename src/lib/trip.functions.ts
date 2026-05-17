@@ -87,6 +87,7 @@ export const saveFlight = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(z.object({
     airline: z.string().max(120).optional().nullable(),
+    airline_iata: z.string().max(3).optional().nullable(),
     flight_number: z.string().min(1).max(20),
     scheduled_at: z.string().min(1).max(60),
     origin_iata: z.string().max(6).optional().nullable(),
@@ -121,6 +122,8 @@ export const saveAccommodation = createServerFn({ method: "POST" })
     check_in: z.string().max(20).optional().nullable(),
     check_out: z.string().max(20).optional().nullable(),
     place_id: z.string().max(200).optional().nullable(),
+    booking_source: z.string().max(40).optional().nullable(),
+    booking_url: z.string().url().max(800).optional().nullable(),
   }))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
