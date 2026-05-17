@@ -376,7 +376,7 @@ function Dashboard() {
         </div>
 
         {/* RIGHT: sticky map */}
-        <div className="lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)]">
+        <div className="lg:sticky lg:top-20 lg:h-[calc(100vh-9rem)]">
           <Card className="h-[55vh] overflow-hidden rounded-3xl border-0 shadow-card lg:h-full">
             <ItineraryMap center={center} zoom={trip.map_default_zoom ?? 11} pins={mapPins} focusedId={focusedId} />
           </Card>
