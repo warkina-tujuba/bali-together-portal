@@ -276,6 +276,39 @@ export type Database = {
           },
         ]
       }
+      live_locations: {
+        Row: {
+          accuracy: number | null
+          heading: number | null
+          lat: number
+          lng: number
+          sharing: boolean
+          trip_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          accuracy?: number | null
+          heading?: number | null
+          lat: number
+          lng: number
+          sharing?: boolean
+          trip_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          accuracy?: number | null
+          heading?: number | null
+          lat?: number
+          lng?: number
+          sharing?: boolean
+          trip_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           body: string

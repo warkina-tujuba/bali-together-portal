@@ -390,3 +390,52 @@ export const isAdmin = createServerFn({ method: "GET" })
     const { data } = await supabaseAdmin.from("user_roles").select("role").eq("user_id", context.userId).eq("role", "admin").maybeSingle();
     return { admin: !!data };
   });
+
+// ---- Live location sharing ----
+export const updateMyLocation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    z.object({
+      lat: z.number().min(-90).max(90),
+      lng: z.number().min(-180).max(180),
+      accuracy: z.number().min(0).max(100000).optional().nullable(),
+      heading: z.number().min(0).max(360).optional().nullable(),
+      sharing: z.boolean().default(true),
+    }),
+  )
+  .handler(async ({ data, context }) => {
+    const { userId } = context;
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("trip_id")
+      .eq("id", userId)
+      .maybeSingle();
+    if (!profile?.trip_id) throw new Error("No trip");
+    const { error } = await supabaseAdmin.from("live_locations").upsert({
+      user_id: userId,
+      trip_id: profile.trip_id,
+      lat: data.lat,
+      lng: data.lng,
+      accuracy: data.accuracy ?? null,
+      heading: data.heading ?? null,
+      sharing: data.sharing,
+      updated_at: new Date().toISOString(),
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const stopSharingLocation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await supabaseAdmin.from("live_locations").delete().eq("user_id", context.userId);
+    return { ok: true };
+  });
+
+export const listLiveLocations = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase } = context;
+    const { data } = await supabase.from("live_locations").select("*").eq("sharing", true);
+    return { locations: data ?? [] };
+  });
