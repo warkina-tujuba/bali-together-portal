@@ -69,7 +69,7 @@ export const updateProfile = createServerFn({ method: "POST" })
     phone: z.string().max(40).optional().nullable(),
     dietary: z.string().max(200).optional().nullable(),
     room_preference: z.string().max(100).optional().nullable(),
-    avatar_url: z.string().url().max(500).optional().nullable(),
+    avatar_url: z.string().max(4000).optional().nullable(),
     onboarding_step: z.number().int().min(0).max(10).optional(),
     onboarding_complete: z.boolean().optional(),
     whatsapp_joined: z.boolean().optional(),
