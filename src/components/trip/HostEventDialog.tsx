@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Crown } from "lucide-react";
 
-export function HostEventDialog({ defaultDate, trigger }: { defaultDate: string; trigger?: React.ReactNode }) {
+export function HostEventDialog({ defaultDate, tripDays, trigger }: { defaultDate: string; tripDays?: string[]; trigger?: React.ReactNode }) {
   const create = useServerFn(createHostEvent);
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
