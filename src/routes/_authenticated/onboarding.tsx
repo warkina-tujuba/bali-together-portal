@@ -3,8 +3,8 @@ import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  acceptInvite, getDashboard, updateProfile, saveFlight, saveAccommodation,
-  geocode, parseFlightText, parseStayText,
+  acceptInvite, getDashboard, updateProfile, saveAccommodation,
+  geocode, parseStayText,
 } from "@/lib/trip.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
