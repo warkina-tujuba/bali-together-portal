@@ -769,3 +769,152 @@ export const getTripPreferences = createServerFn({ method: "GET" })
     const { data } = await supabase.from("trip_preferences").select("*").eq("trip_id", profile.trip_id).maybeSingle();
     return { prefs: data };
   });
+
+// ============================================================
+// Group-first itinerary: activities + creators + RSVPs + stays
+// ============================================================
+export const getItineraryHome = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const { data: profile } = await supabase.from("profiles").select("trip_id").eq("id", userId).maybeSingle();
+    if (!profile?.trip_id) return { trip: null, activities: [], stays: [], flights: [], rsvps: [], members: [], userId };
+    const tripId = profile.trip_id;
+    const [{ data: trip }, { data: activities }, { data: stays }, { data: flights }, { data: rsvps }, { data: members }] = await Promise.all([
+      supabase.from("trips").select("*").eq("id", tripId).maybeSingle(),
+      supabase.from("activities").select("*").eq("trip_id", tripId).order("day_date").order("is_host_event", { ascending: false }).order("start_time", { ascending: true, nullsFirst: true }),
+      supabase.from("accommodations").select("*").eq("trip_id", tripId),
+      supabase.from("flights").select("*").eq("trip_id", tripId),
+      supabase.from("event_rsvps").select("*").eq("trip_id", tripId),
+      supabase.from("profiles").select("id, full_name, avatar_url").eq("trip_id", tripId),
+    ]);
+    return {
+      trip,
+      activities: activities ?? [],
+      stays: stays ?? [],
+      flights: flights ?? [],
+      rsvps: rsvps ?? [],
+      members: members ?? [],
+      userId,
+    };
+  });
+
+export const createHostEvent = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({
+    day_date: z.string().min(8).max(20),
+    title: z.string().min(1).max(200),
+    start_time: z.string().max(10).optional().nullable(),
+    end_time: z.string().max(10).optional().nullable(),
+    location: z.string().max(200).optional().nullable(),
+    description: z.string().max(2000).optional().nullable(),
+    lat: z.number().min(-90).max(90).optional().nullable(),
+    lng: z.number().min(-180).max(180).optional().nullable(),
+    booking_url: z.string().url().max(800).optional().nullable(),
+    category: z.enum(["food", "activity", "culture", "nightlife", "chill", "transit", "other"]).default("activity"),
+  }))
+  .handler(async ({ data, context }) => {
+    const { userId } = context;
+    const { data: role } = await supabaseAdmin.from("user_roles").select("role").eq("user_id", userId).eq("role", "admin").maybeSingle();
+    if (!role) throw new Error("Host only");
+    const { data: profile } = await supabaseAdmin.from("profiles").select("trip_id").eq("id", userId).maybeSingle();
+    if (!profile?.trip_id) throw new Error("No trip");
+    const { data: act, error } = await supabaseAdmin.from("activities").insert({
+      ...data,
+      trip_id: profile.trip_id,
+      created_by: userId,
+      is_host_event: true,
+    }).select("id").single();
+    if (error || !act) throw new Error(error?.message ?? "Couldn't create event");
+    // auto-RSVP host
+    await supabaseAdmin.from("event_rsvps").insert({
+      activity_id: act.id, user_id: userId, trip_id: profile.trip_id, status: "going",
+    });
+    return { ok: true, id: act.id };
+  });
+
+export const recommendActivities = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({
+    adventure: z.number().min(1).max(5).default(3),
+    pace: z.number().min(1).max(5).default(3),
+    popularity: z.number().min(1).max(5).default(3),
+    limit: z.number().int().min(1).max(24).default(12),
+  }))
+  .handler(async ({ data, context }) => {
+    const { BALI_CATALOGUE } = await import("@/data/bali-activities");
+    const { supabase, userId } = context;
+    const { data: profile } = await supabase.from("profiles").select("trip_id").eq("id", userId).maybeSingle();
+    const used = new Set<string>();
+    if (profile?.trip_id) {
+      const { data: existing } = await supabase.from("activities").select("title").eq("trip_id", profile.trip_id);
+      (existing ?? []).forEach((a) => used.add((a.title ?? "").toLowerCase()));
+    }
+    const POPULAR_IDS = new Set([
+      "morning-tegalalang", "afternoon-monkey-forest", "afternoon-uluwatu-temple",
+      "afternoon-nusa-penida", "evening-single-fin", "evening-finns-club",
+      "evening-savaya", "evening-jimbaran-seafood", "morning-mt-batur",
+    ]);
+    const scored = BALI_CATALOGUE
+      .filter((e) => !used.has(e.title.toLowerCase()))
+      .map((e) => {
+        const advScore = e.intensity === 3 ? 5 : e.intensity === 2 ? 3 : 1;
+        const paceScore = e.duration_min < 120 ? 5 : e.duration_min < 240 ? 3 : 1;
+        const popScore = POPULAR_IDS.has(e.id) ? 5 : 2;
+        const dist = Math.abs(advScore - data.adventure) + Math.abs(paceScore - data.pace) + Math.abs(popScore - data.popularity);
+        return { e, dist };
+      })
+      .sort((a, b) => a.dist - b.dist)
+      .slice(0, data.limit)
+      .map(({ e }) => ({
+        catalogue_id: e.id,
+        title: e.title,
+        description: e.description,
+        location: e.location,
+        lat: e.lat,
+        lng: e.lng,
+        category: e.category,
+        image_url: e.image_url,
+        duration_min: e.duration_min,
+        daypart: e.daypart,
+        area: e.area,
+      }));
+    return { recommendations: scored };
+  });
+
+export const addCatalogueToTrip = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({
+    catalogue_id: z.string().min(1).max(80),
+    day_date: z.string().min(8).max(20),
+  }))
+  .handler(async ({ data, context }) => {
+    const { BALI_CATALOGUE } = await import("@/data/bali-activities");
+    const { userId } = context;
+    const entry = BALI_CATALOGUE.find((e) => e.id === data.catalogue_id);
+    if (!entry) throw new Error("Recommendation not found");
+    const { data: profile } = await supabaseAdmin.from("profiles").select("trip_id").eq("id", userId).maybeSingle();
+    if (!profile?.trip_id) throw new Error("No trip");
+    const start = entry.daypart === "morning" ? "09:00" : entry.daypart === "afternoon" ? "13:30" : "18:30";
+    const { data: act, error } = await supabaseAdmin.from("activities").insert({
+      trip_id: profile.trip_id,
+      created_by: userId,
+      day_date: data.day_date,
+      title: entry.title,
+      description: entry.description,
+      location: entry.location,
+      start_time: start,
+      duration_min: entry.duration_min,
+      lat: entry.lat,
+      lng: entry.lng,
+      category: entry.category,
+      image_url: entry.image_url,
+      is_host_event: false,
+    }).select("id").single();
+    if (error || !act) throw new Error(error?.message ?? "Couldn't add");
+    // auto-RSVP the adder
+    await supabaseAdmin.from("event_rsvps").insert({
+      activity_id: act.id, user_id: userId, trip_id: profile.trip_id, status: "going",
+    });
+    return { ok: true, id: act.id };
+  });

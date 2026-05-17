@@ -81,6 +81,7 @@ export type Database = {
       }
       activities: {
         Row: {
+          booking_url: string | null
           category: Database["public"]["Enums"]["event_category"]
           cover_image_url: string | null
           created_at: string
@@ -91,9 +92,13 @@ export type Database = {
           end_time: string | null
           id: string
           image_url: string | null
+          is_host_event: boolean
           lat: number | null
           lng: number | null
           location: string | null
+          scale_adventure: number | null
+          scale_pace: number | null
+          scale_popularity: number | null
           sort_index: number
           start_time: string | null
           tags: string[] | null
@@ -101,6 +106,7 @@ export type Database = {
           trip_id: string
         }
         Insert: {
+          booking_url?: string | null
           category?: Database["public"]["Enums"]["event_category"]
           cover_image_url?: string | null
           created_at?: string
@@ -111,9 +117,13 @@ export type Database = {
           end_time?: string | null
           id?: string
           image_url?: string | null
+          is_host_event?: boolean
           lat?: number | null
           lng?: number | null
           location?: string | null
+          scale_adventure?: number | null
+          scale_pace?: number | null
+          scale_popularity?: number | null
           sort_index?: number
           start_time?: string | null
           tags?: string[] | null
@@ -121,6 +131,7 @@ export type Database = {
           trip_id: string
         }
         Update: {
+          booking_url?: string | null
           category?: Database["public"]["Enums"]["event_category"]
           cover_image_url?: string | null
           created_at?: string
@@ -131,9 +142,13 @@ export type Database = {
           end_time?: string | null
           id?: string
           image_url?: string | null
+          is_host_event?: boolean
           lat?: number | null
           lng?: number | null
           location?: string | null
+          scale_adventure?: number | null
+          scale_pace?: number | null
+          scale_popularity?: number | null
           sort_index?: number
           start_time?: string | null
           tags?: string[] | null
