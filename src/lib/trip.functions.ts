@@ -76,8 +76,8 @@ export const updateProfile = createServerFn({ method: "POST" })
   }))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const patch: Record<string, unknown> = { ...data };
-    if (data.whatsapp_joined) { patch.whatsapp_joined_at = new Date().toISOString(); delete patch.whatsapp_joined; }
+    const { whatsapp_joined, ...rest } = data;
+    const patch = whatsapp_joined ? { ...rest, whatsapp_joined_at: new Date().toISOString() } : rest;
     const { error } = await supabase.from("profiles").update(patch).eq("id", userId);
     if (error) throw new Error(error.message);
     return { ok: true };
