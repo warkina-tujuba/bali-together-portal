@@ -22,7 +22,7 @@ function MapPage() {
         {data.stays.filter((s) => s.lat != null && s.lng != null).length} villas across {data.trip.destination}
       </p>
       <div className="overflow-hidden rounded-3xl shadow-card" style={{ height: "72vh" }}>
-        {mounted && <LeafletMap data={data} />}
+        {mounted && data.trip && <LeafletMap data={{ trip: data.trip, stays: data.stays, members: data.members }} />}
       </div>
     </div>
   );
