@@ -67,7 +67,10 @@ export function StayDialog({ trigger, initial }: { trigger: React.ReactNode; ini
           booking_url: booking_url || null,
         },
       });
-      await qc.invalidateQueries({ queryKey: ["dashboard"] });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["dashboard"] }),
+        qc.invalidateQueries({ queryKey: ["itineraryHome"] }),
+      ]);
       toast.success("Stay saved");
       setOpen(false);
     } catch (e) {
