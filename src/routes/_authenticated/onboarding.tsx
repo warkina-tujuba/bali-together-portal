@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import { AvatarPicker } from "@/components/trip/AvatarPicker";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -108,21 +109,25 @@ function Onboarding() {
   );
 }
 
-function StepProfile({ initial, onNext }: { initial: { full_name?: string | null; phone?: string | null; dietary?: string | null; room_preference?: string | null } | null; onNext: (p: Record<string, unknown>) => void }) {
+function StepProfile({ initial, onNext }: { initial: { full_name?: string | null; phone?: string | null; dietary?: string | null; room_preference?: string | null; avatar_url?: string | null } | null; onNext: (p: Record<string, unknown>) => void }) {
   const [full_name, setName] = useState(initial?.full_name ?? "");
   const [phone, setPhone] = useState(initial?.phone ?? "");
   const [dietary, setDietary] = useState(initial?.dietary ?? "");
   const [room_preference, setRoom] = useState(initial?.room_preference ?? "");
+  const [avatar_url, setAvatar] = useState<string | null>(initial?.avatar_url ?? null);
   return (
     <Card className="rounded-3xl border-0 p-7 shadow-card">
       <h2 className="font-display text-3xl">A little about you</h2>
-      <div className="mt-5 space-y-3">
+      <div className="mt-5 space-y-4">
+        <Field label="Pick your hero">
+          <AvatarPicker value={avatar_url} onChange={(url) => setAvatar(url)} />
+        </Field>
         <Field label="Full name"><Input value={full_name} onChange={(e) => setName(e.target.value)} className="h-12 rounded-xl" /></Field>
         <Field label="Phone (with country code)"><Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+1 555…" className="h-12 rounded-xl" /></Field>
         <Field label="Dietary"><Input value={dietary} onChange={(e) => setDietary(e.target.value)} placeholder="None, vegetarian, allergies…" className="h-12 rounded-xl" /></Field>
         <Field label="Room preference"><Input value={room_preference} onChange={(e) => setRoom(e.target.value)} placeholder="King, twin, solo…" className="h-12 rounded-xl" /></Field>
       </div>
-      <Button className="mt-6 h-12 w-full rounded-xl text-base" disabled={!full_name.trim()} onClick={() => onNext({ full_name, phone, dietary, room_preference })}>Continue</Button>
+      <Button className="mt-6 h-12 w-full rounded-xl text-base" disabled={!full_name.trim()} onClick={() => onNext({ full_name, phone, dietary, room_preference, avatar_url })}>Continue</Button>
     </Card>
   );
 }
