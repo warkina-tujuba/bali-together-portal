@@ -439,3 +439,120 @@ export const listLiveLocations = createServerFn({ method: "GET" })
     const { data } = await supabase.from("live_locations").select("*").eq("sharing", true);
     return { locations: data ?? [] };
   });
+
+// ---- Host: create a trip from scratch ----
+export const createTrip = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({
+    name: z.string().min(1).max(120),
+    occasion: z.string().min(1).max(60),
+    destination: z.string().min(1).max(120),
+    lat: z.number().min(-90).max(90).optional().nullable(),
+    lng: z.number().min(-180).max(180).optional().nullable(),
+    start_date: z.string().min(8).max(20),
+    end_date: z.string().min(8).max(20),
+    description: z.string().max(2000).optional().nullable(),
+  }))
+  .handler(async ({ data, context }) => {
+    const { userId } = context;
+    // Create trip
+    const { data: trip, error } = await supabaseAdmin.from("trips").insert({
+      name: data.name,
+      destination: data.destination,
+      occasion: data.occasion,
+      start_date: data.start_date,
+      end_date: data.end_date,
+      description: data.description ?? null,
+      map_center_lat: data.lat ?? null,
+      map_center_lng: data.lng ?? null,
+      is_active: false,
+    }).select("*").single();
+    if (error || !trip) throw new Error(error?.message ?? "Couldn't create trip");
+    // Grant host admin role (idempotent)
+    await supabaseAdmin.from("user_roles").upsert(
+      { user_id: userId, role: "admin" },
+      { onConflict: "user_id,role" },
+    );
+    // Link host's profile to this trip
+    await supabaseAdmin.from("profiles").update({ trip_id: trip.id }).eq("id", userId);
+    return { trip };
+  });
+
+// ---- Host: create a magic link (multi-use invite) ----
+export const createMagicLink = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({
+    full_name: z.string().min(1).max(120).default("Guest"),
+    max_uses: z.number().int().min(1).max(500).default(50),
+  }))
+  .handler(async ({ data, context }) => {
+    const { userId } = context;
+    const { data: profile } = await supabaseAdmin.from("profiles").select("trip_id").eq("id", userId).maybeSingle();
+    if (!profile?.trip_id) throw new Error("No trip");
+    const token = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "").slice(0, 8);
+    const { data: inv, error } = await supabaseAdmin.from("invites").insert({
+      token,
+      full_name: data.full_name,
+      trip_id: profile.trip_id,
+      created_by: userId,
+      max_uses: data.max_uses,
+    }).select("*").single();
+    if (error) throw new Error(error.message);
+    return { invite: inv, token };
+  });
+
+// ---- Host: add a single event/activity ----
+export const addActivity = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({
+    day_date: z.string().min(8).max(20),
+    title: z.string().min(1).max(200),
+    start_time: z.string().max(10).optional().nullable(),
+    location: z.string().max(200).optional().nullable(),
+    description: z.string().max(2000).optional().nullable(),
+  }))
+  .handler(async ({ data, context }) => {
+    const { userId } = context;
+    const { data: profile } = await supabaseAdmin.from("profiles").select("trip_id").eq("id", userId).maybeSingle();
+    if (!profile?.trip_id) throw new Error("No trip");
+    const { error } = await supabaseAdmin.from("activities").insert({
+      trip_id: profile.trip_id,
+      day_date: data.day_date,
+      title: data.title,
+      start_time: data.start_time || null,
+      location: data.location || null,
+      description: data.description || null,
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// ---- Host: persist AI-drafted days ----
+export const saveItineraryDays = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({
+    days: z.array(z.object({
+      date: z.string().min(8).max(20),
+      title: z.string().min(1).max(200),
+      summary: z.string().max(2000).optional().nullable(),
+    })).max(60),
+  }))
+  .handler(async ({ data, context }) => {
+    const { userId } = context;
+    const { data: profile } = await supabaseAdmin.from("profiles").select("trip_id").eq("id", userId).maybeSingle();
+    if (!profile?.trip_id) throw new Error("No trip");
+    if (data.days.length === 0) return { ok: true };
+    const tripId = profile.trip_id;
+    const rows = data.days.map((d, i) => ({
+      trip_id: tripId,
+      day_date: d.date,
+      title: d.title,
+      summary: d.summary ?? null,
+      sort_index: i,
+    }));
+    // Replace existing days for this trip with the fresh AI draft
+    await supabaseAdmin.from("itinerary_days").delete().eq("trip_id", tripId);
+    const { error } = await supabaseAdmin.from("itinerary_days").insert(rows);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });

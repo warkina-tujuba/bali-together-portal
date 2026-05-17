@@ -2,11 +2,11 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { getDashboard, suggestItinerary, updateProfile, isAdmin as isAdminFn } from "@/lib/trip.functions";
+import { getDashboard, suggestItinerary, updateProfile, isAdmin as isAdminFn, createMagicLink } from "@/lib/trip.functions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Plane, Home, MessageCircle, Sparkles, Send, CheckCircle2, AlertCircle, Users } from "lucide-react";
+import { Plane, Home, MessageCircle, Sparkles, Send, CheckCircle2, AlertCircle, Users, Copy, Check } from "lucide-react";
 import { FlightDialog } from "@/components/trip/FlightDialog";
 import { StayDialog } from "@/components/trip/StayDialog";
 import { airlineLogoUrl, parseAirlineCode } from "@/lib/airline";
@@ -19,10 +19,13 @@ function Dashboard() {
   const aiFn = useServerFn(suggestItinerary);
   const updFn = useServerFn(updateProfile);
   const adminCheck = useServerFn(isAdminFn);
+  const magicFn = useServerFn(createMagicLink);
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["dashboard"], queryFn: () => fn() });
   const { data: adminData } = useQuery({ queryKey: ["isAdmin"], queryFn: () => adminCheck() });
   const [aiDays, setAiDays] = useState<Array<{ date: string; title: string; items: string[] }> | null>(null);
+  const [magicUrl, setMagicUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const aiMut = useMutation({
     mutationFn: () => aiFn(),
@@ -30,13 +33,24 @@ function Dashboard() {
     onError: (e) => toast.error(e instanceof Error ? e.message : "AI failed"),
   });
 
+  async function copyMagic() {
+    try {
+      const r = await magicFn({ data: { full_name: "Guest", max_uses: 50 } });
+      const url = `${window.location.origin}/?invite=${r.token}`;
+      setMagicUrl(url);
+      await navigator.clipboard.writeText(url).catch(() => {});
+      setCopied(true);
+      toast.success("Magic link copied!");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Couldn't create link"); }
+  }
+
   if (isLoading || !data) return <div className="p-10 text-center text-muted-foreground">Loading…</div>;
   if (!data.trip) return (
     <div className="mx-auto max-w-md p-6">
       <Card className="rounded-3xl border-0 p-7 shadow-card">
         <h2 className="font-display text-3xl">No trip yet</h2>
-        <p className="mt-2 text-muted-foreground">You're not linked to a trip — paste your invite code.</p>
-        <Link to="/" className="mt-5 inline-block rounded-full bg-primary px-5 py-2.5 text-sm text-primary-foreground">Enter code</Link>
+        <p className="mt-2 text-muted-foreground">Start a new trip or paste a magic link to join one.</p>
+        <Link to="/choose" className="mt-5 inline-block rounded-full bg-primary px-5 py-2.5 text-sm text-primary-foreground">Get started</Link>
       </Card>
     </div>
   );
@@ -187,20 +201,29 @@ function Dashboard() {
             </div>
           )}
 
-          {/* Ready to send */}
-          <div className={`mt-6 rounded-2xl p-4 ${allReady ? "bg-primary/10" : "bg-secondary"}`}>
-            <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
-              <div>
-                <p className="font-display text-lg">{allReady ? "You're ready to send the magic link" : "Almost ready"}</p>
-                <p className="text-sm text-muted-foreground">{allReady ? "Invite the crew with one tap." : "Finish the checklist above to unlock."}</p>
-              </div>
-              <Link to={isAdmin ? "/admin" : "/chat"}>
-                <Button disabled={!allReady} className="h-11 rounded-xl px-5">
-                  <Send className="mr-2 h-4 w-4" />{isAdmin ? "Send magic link" : "Open chat"}
+          {/* Magic link */}
+          {isAdmin && (
+            <div className={`mt-6 rounded-2xl p-4 ${allReady ? "bg-primary/10" : "bg-secondary"}`}>
+              <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+                <div>
+                  <p className="font-display text-lg">Invite the crew</p>
+                  <p className="text-sm text-muted-foreground">One magic link — copy and paste anywhere.</p>
+                </div>
+                <Button onClick={copyMagic} className="h-11 rounded-xl px-5">
+                  {copied ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}{copied ? "Copied" : "Copy magic link"}
                 </Button>
-              </Link>
+              </div>
+              {magicUrl && <div className="mt-3 break-all rounded-xl bg-background p-3 font-mono text-xs">{magicUrl}</div>}
             </div>
-          </div>
+          )}
+          {!isAdmin && (
+            <div className="mt-6 rounded-2xl bg-secondary p-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm text-muted-foreground">{allReady ? "All set — say hi in the group chat." : "Finish the checklist above to unlock."}</p>
+                <Link to="/chat"><Button disabled={!allReady} className="h-11 rounded-xl px-5"><Send className="mr-2 h-4 w-4" />Open chat</Button></Link>
+              </div>
+            </div>
+          )}
         </Card>
 
         {/* Crew */}

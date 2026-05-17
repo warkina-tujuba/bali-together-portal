@@ -57,11 +57,14 @@ function Onboarding() {
     if (data?.profile) {
       if (data.profile.onboarding_complete) {
         navigate({ to: "/dashboard" });
+      } else if (!data.profile.trip_id && !invite) {
+        // no trip and no invite → send to chooser
+        navigate({ to: "/choose" });
       } else {
         setStep(Math.min(data.profile.onboarding_step ?? 0, 3));
       }
     }
-  }, [data, navigate]);
+  }, [data, navigate, invite]);
 
   if (isLoading || !data) return <div className="flex min-h-screen items-center justify-center text-muted-foreground">Loading…</div>;
 

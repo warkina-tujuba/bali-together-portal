@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as ChooseRouteImport } from './routes/choose'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
@@ -18,10 +19,16 @@ import { Route as AuthenticatedItineraryRouteImport } from './routes/_authentica
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated/chat'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as AuthenticatedTripNewRouteImport } from './routes/_authenticated/trip.new'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChooseRoute = ChooseRouteImport.update({
+  id: '/choose',
+  path: '/choose',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
@@ -63,9 +70,15 @@ const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedTripNewRoute = AuthenticatedTripNewRouteImport.update({
+  id: '/trip/new',
+  path: '/trip/new',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/choose': typeof ChooseRoute
   '/login': typeof LoginRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/chat': typeof AuthenticatedChatRoute
@@ -73,9 +86,11 @@ export interface FileRoutesByFullPath {
   '/itinerary': typeof AuthenticatedItineraryRoute
   '/map': typeof AuthenticatedMapRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
+  '/trip/new': typeof AuthenticatedTripNewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/choose': typeof ChooseRoute
   '/login': typeof LoginRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/chat': typeof AuthenticatedChatRoute
@@ -83,11 +98,13 @@ export interface FileRoutesByTo {
   '/itinerary': typeof AuthenticatedItineraryRoute
   '/map': typeof AuthenticatedMapRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
+  '/trip/new': typeof AuthenticatedTripNewRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
+  '/choose': typeof ChooseRoute
   '/login': typeof LoginRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/chat': typeof AuthenticatedChatRoute
@@ -95,11 +112,13 @@ export interface FileRoutesById {
   '/_authenticated/itinerary': typeof AuthenticatedItineraryRoute
   '/_authenticated/map': typeof AuthenticatedMapRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
+  '/_authenticated/trip/new': typeof AuthenticatedTripNewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/choose'
     | '/login'
     | '/admin'
     | '/chat'
@@ -107,9 +126,11 @@ export interface FileRouteTypes {
     | '/itinerary'
     | '/map'
     | '/onboarding'
+    | '/trip/new'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/choose'
     | '/login'
     | '/admin'
     | '/chat'
@@ -117,10 +138,12 @@ export interface FileRouteTypes {
     | '/itinerary'
     | '/map'
     | '/onboarding'
+    | '/trip/new'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
+    | '/choose'
     | '/login'
     | '/_authenticated/admin'
     | '/_authenticated/chat'
@@ -128,11 +151,13 @@ export interface FileRouteTypes {
     | '/_authenticated/itinerary'
     | '/_authenticated/map'
     | '/_authenticated/onboarding'
+    | '/_authenticated/trip/new'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
+  ChooseRoute: typeof ChooseRoute
   LoginRoute: typeof LoginRoute
 }
 
@@ -143,6 +168,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/choose': {
+      id: '/choose'
+      path: '/choose'
+      fullPath: '/choose'
+      preLoaderRoute: typeof ChooseRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -201,6 +233,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/trip/new': {
+      id: '/_authenticated/trip/new'
+      path: '/trip/new'
+      fullPath: '/trip/new'
+      preLoaderRoute: typeof AuthenticatedTripNewRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
   }
 }
 
@@ -211,6 +250,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedItineraryRoute: typeof AuthenticatedItineraryRoute
   AuthenticatedMapRoute: typeof AuthenticatedMapRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
+  AuthenticatedTripNewRoute: typeof AuthenticatedTripNewRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -220,6 +260,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedItineraryRoute: AuthenticatedItineraryRoute,
   AuthenticatedMapRoute: AuthenticatedMapRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
+  AuthenticatedTripNewRoute: AuthenticatedTripNewRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
@@ -229,6 +270,7 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
+  ChooseRoute: ChooseRoute,
   LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport
