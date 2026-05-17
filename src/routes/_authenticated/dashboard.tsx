@@ -9,7 +9,6 @@ import { toast } from "sonner";
 import { Plane, Home, MessageCircle, Sparkles, Send, CheckCircle2, AlertCircle, Users } from "lucide-react";
 import { FlightDialog } from "@/components/trip/FlightDialog";
 import { StayDialog } from "@/components/trip/StayDialog";
-import { WhatsAppDialog } from "@/components/trip/WhatsAppDialog";
 import { airlineLogoUrl, parseAirlineCode } from "@/lib/airline";
 import { bookingSourceMeta } from "@/lib/booking-source";
 
@@ -50,12 +49,10 @@ function Dashboard() {
 
   const myFlight = data.flights.find((f) => f.user_id === data.profile?.id);
   const myStay = data.stays.find((s) => s.user_id === data.profile?.id);
-  const waJoined = !!data.profile?.whatsapp_joined_at;
 
   const steps = [
     { done: !!myFlight, label: "Flight" },
     { done: !!myStay, label: "Stay" },
-    { done: waJoined, label: "WhatsApp" },
   ];
   const completed = steps.filter((s) => s.done).length;
   const allReady = completed === steps.length;
@@ -110,23 +107,6 @@ function Dashboard() {
           }
         />
       )}
-      {!waJoined && (
-        <WhatsAppDialog
-          isAdmin={isAdmin}
-          inviteUrl={trip.whatsapp_invite_url ?? null}
-          joined={waJoined}
-          tripName={trip.name}
-          trigger={
-            <button className="mt-4 flex w-full flex-col items-start justify-between gap-2 rounded-2xl bg-secondary px-4 py-3 text-left sm:flex-row sm:items-center">
-              <div className="flex items-start gap-2 text-sm">
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                <span>Join the WhatsApp group for real-time updates.</span>
-              </div>
-              <span className="shrink-0 text-sm font-medium text-primary">Connect →</span>
-            </button>
-          }
-        />
-      )}
 
       <div className="mt-5 grid gap-5 lg:grid-cols-3">
         {/* Profile checklist */}
@@ -169,23 +149,15 @@ function Dashboard() {
                 </button>
               }
             />
-            <WhatsAppDialog
-              isAdmin={isAdmin}
-              inviteUrl={trip.whatsapp_invite_url ?? null}
-              joined={waJoined}
-              tripName={trip.name}
-              trigger={
-                <button className="w-full text-left">
-                  <StatusTile
-                    icon={<MessageCircle className="h-5 w-5" />}
-                    title="WhatsApp group"
-                    status={waJoined ? "Joined" : trip.whatsapp_invite_url ? "Tap to join" : "Not yet connected"}
-                    done={waJoined}
-                    cta={waJoined ? "Open" : "Connect"}
-                  />
-                </button>
-              }
-            />
+            <Link to="/chat" className="w-full text-left">
+              <StatusTile
+                icon={<MessageCircle className="h-5 w-5" />}
+                title="Group chat"
+                status={`${data.members.length} in the crew`}
+                done={false}
+                cta="Open"
+              />
+            </Link>
             <button className="w-full text-left" onClick={() => aiMut.mutate()} disabled={aiMut.isPending}>
               <StatusTile
                 icon={<Sparkles className="h-5 w-5" />}
@@ -222,21 +194,11 @@ function Dashboard() {
                 <p className="font-display text-lg">{allReady ? "You're ready to send the magic link" : "Almost ready"}</p>
                 <p className="text-sm text-muted-foreground">{allReady ? "Invite the crew with one tap." : "Finish the checklist above to unlock."}</p>
               </div>
-              {isAdmin ? (
-                <WhatsAppDialog
-                  isAdmin={isAdmin}
-                  inviteUrl={trip.whatsapp_invite_url ?? null}
-                  joined={waJoined}
-                  tripName={trip.name}
-                  trigger={
-                    <Button disabled={!allReady} className="h-11 rounded-xl px-5"><Send className="mr-2 h-4 w-4" />Send magic link</Button>
-                  }
-                />
-              ) : (
-                <Link to="/admin">
-                  <Button disabled={!allReady} className="h-11 rounded-xl px-5"><Send className="mr-2 h-4 w-4" />Send magic link</Button>
-                </Link>
-              )}
+              <Link to={isAdmin ? "/admin" : "/chat"}>
+                <Button disabled={!allReady} className="h-11 rounded-xl px-5">
+                  <Send className="mr-2 h-4 w-4" />{isAdmin ? "Send magic link" : "Open chat"}
+                </Button>
+              </Link>
             </div>
           </div>
         </Card>
@@ -255,7 +217,7 @@ function Dashboard() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{m.full_name ?? "Guest"}</p>
-                  <p className="truncate text-xs text-muted-foreground">{m.whatsapp_joined_at ? "WhatsApp ✓" : "Pending"}</p>
+                  <p className="truncate text-xs text-muted-foreground">In the crew</p>
                 </div>
               </li>
             ))}

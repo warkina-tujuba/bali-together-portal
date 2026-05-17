@@ -1,56 +1,56 @@
-# Bali Group Trip Portal — Free-API Build Plan
+## Scope
 
-Same product, design direction (Uluwatu Luxe), and DM Serif Display + Fira Sans typography as already approved. Only change: external APIs are swapped to **free, key-less** options.
+Five things in one pass. Mapbox is being set up by you separately — I'll keep the current OpenStreetMap pin for stays for now, and wire Mapbox in a follow-up once the token lands.
 
-## API swaps (vs. original plan)
+### 1. New Magic Link logo
+Generate a fresh transparent-PNG logo that reads as "magic link" (envelope + pin/sparkle), drop into `src/assets/logo.png`, reuse on home + header.
 
-| Need | Old (paid/key) | New (free, no key) |
-|---|---|---|
-| Map tiles | Mapbox GL JS + token | **Leaflet** + **OpenStreetMap** raster tiles |
-| Accommodation lookup | Mapbox Places | **Nominatim** (OSM geocoding, public endpoint) |
-| Flight lookup | AeroDataBox via RapidAPI | **Manual entry**, with a built-in slot for AviationStack later if desired |
+### 2. Homepage — sliding global locations background
+- Replace the static Unsplash hero with a CSS keyframe marquee of 6–8 destination photos (Bali, Tokyo, Lisbon, Marrakech, Reykjavik, NYC, Cape Town, Queenstown) sliding horizontally behind a dark gradient overlay.
+- Tighten copy and flow: hero → "How it works" (3 steps) → portal preview → real-trip showcase. Drop redundant "what's in the portal" 4-up since "how it works" already covers it.
+- Single primary CTA per section.
 
-No secrets need to be added. Everything runs out of the box.
+### 3. Onboarding — PNR / booking-reference first, manual secondary (flights)
+- Replace `StepFlight` with two tabs: **"Paste booking" (default)** and **"Add manually"**.
+- "Paste booking" = single big textarea — user pastes the confirmation email body, booking reference, or even a flight number + date line. New server fn `parseFlightText` calls Lovable AI Gateway (`google/gemini-2.5-flash`, JSON mode) → returns `{airline, flight_number, scheduled_at, origin_iata, destination_iata, confidence}`. Show parsed fields in editable preview, user confirms → saves.
+- Be honest in copy: "Paste your airline confirmation email — we'll pull out the flight number, date and route. If it's a booking reference only (e.g. `XYZ123`), add the airline name with it so we can look it up."
+- Manual tab = the existing form, kept as fallback.
 
-### Why these are safe to use directly
+### 4. Onboarding — paste-a-link stays (best UX for accommodation)
+- Replace `StepStay` with two tabs: **"Paste booking" (default)** and **"Search by name"**.
+- "Paste booking" = textarea/url field. New server fn `parseStayText` runs AI extraction on pasted confirmation text or URL → returns `{name, address, check_in, check_out, booking_source, booking_url}`. We then geocode the address via the existing `geocode` fn to get lat/lng for the pin.
+- Detect source (booking.com, airbnb.com, agoda, etc.) from URL host for the badge.
+- "Search by name" tab = existing geocode search, kept.
 
-- **OpenStreetMap tiles** — free for low/moderate use; we set a proper `User-Agent`-style attribution and reasonable zoom limits.
-- **Nominatim** — free public geocoder; we throttle queries (300ms debounce, min 3 chars), set a descriptive `Referer`, and call it from a server function so we control rate and can swap providers later without touching the UI.
-- **Leaflet** — MIT-licensed JS lib, installed via npm.
+### 5. Remove WhatsApp, add native group chat
+- New table `messages` (id, trip_id, user_id, body, created_at) with RLS — trip members read/write only their trip. Realtime enabled.
+- New server fns: `listMessages`, `sendMessage`.
+- New route `/_authenticated/chat` — full-height chat UI with avatars (heroes!), live updates via Supabase Realtime subscription.
+- Dashboard: replace WhatsApp tile/banner/dialog with **"Group chat"** tile linking to `/chat`. Remove `WhatsAppDialog` imports. Drop WhatsApp from onboarding (now 4 steps: Welcome → Profile → Flight → Stay; chat is discoverable from the dashboard, no forced step).
+- Keep `whatsapp_invite_url` column for now (don't break existing data); just stop surfacing it in UI.
 
-## Onboarding wizard (unchanged steps, free-API behavior)
+## Technical notes
 
-1. **Identify** — confirm name from invite.
-2. **Profile** — phone, dietary, room preference, avatar.
-3. **Flight** — guest enters airline, flight number, date, arrival airport, arrival time. Clean form, no lookup required. (Later we can wire an optional lookup behind a feature flag.)
-4. **Accommodation** — type a hotel/villa name or address → Nominatim suggestions → pick → we store name, address, lat, lng.
-5. **WhatsApp** — deep link to the trip's group invite (set by admin), mark joined.
+- AI parsing uses existing `LOVABLE_API_KEY` (already in secrets). Strict JSON mode. Returns `confidence: "high"|"medium"|"low"` so the UI can warn if low.
+- Locations marquee uses pure CSS `@keyframes` + duplicated track for seamless loop. No JS.
+- Messages table migration is the only DB change.
+- No boarding-pass scan (per your instruction).
+- Mapbox swap deferred until you share the token — current Leaflet/OSM map keeps working.
 
-## Map experience
+## Files
 
-- Group accommodation map uses **Leaflet** with OSM tiles, custom round terracotta pins for guest stays, popup with guest name + stay name.
-- Dashboard shows a small map preview; `/map` shows the full-screen version.
-- Default center comes from the trip row (Bali coords pre-seeded).
+**New**
+- `src/routes/_authenticated/chat.tsx` — group chat UI
+- `src/components/trip/FlightPasteForm.tsx`, `FlightManualForm.tsx`
+- `src/components/trip/StayPasteForm.tsx`, `StaySearchForm.tsx`
+- `src/components/home/LocationMarquee.tsx`
+- `supabase/migrations/<ts>_messages.sql`
 
-## Everything else unchanged from approved plan
+**Edited**
+- `src/lib/trip.functions.ts` — add `parseFlightText`, `parseStayText`, `listMessages`, `sendMessage`
+- `src/routes/_authenticated/onboarding.tsx` — new flight/stay steps, drop WhatsApp step
+- `src/routes/_authenticated/dashboard.tsx` — group chat replaces WhatsApp
+- `src/routes/index.tsx` — marquee hero, flow rework
+- `src/assets/logo.png` — regenerated
 
-- Schema, RLS, roles, has_role, profile auto-creation trigger — already migrated.
-- Routes: `/`, `/login`, `/onboarding`, `/dashboard`, `/itinerary`, `/map`, `/admin/*`.
-- Auth: email magic link + invite token acceptance via `/api/public/accept-invite`.
-- Server functions: `acceptInvite`, `updateProfile`, `geocode` (Nominatim proxy), `saveFlight`, `saveAccommodation`, `getDashboard`, `getItinerary`, admin CRUD.
-- Design tokens (jungle/terracotta/sand/paper), fonts (DM Serif Display + Fira Sans), mobile-first composition exactly matching the chosen prototype.
-- Seed: trip "Warkina 30th Bali" + sample itinerary days/activities.
-- Admin: invite generator, guest table, itinerary editor, trip settings (incl. WhatsApp URL).
-
-## Build sequence
-
-1. Tokens + base layout (root, `_authenticated`, `_admin`, nav, fonts).
-2. Magic-link login + invite landing + `/api/public/accept-invite`.
-3. Onboarding wizard (with Nominatim lookup in step 4).
-4. Dashboard + full `/map` (Leaflet) + full `/itinerary`.
-5. Admin views.
-6. Seed sample data for the Warkina trip.
-
-## Out of scope
-
-Real-time flight status, push notifications, payments, multi-trip, two-way WhatsApp sync.
+Approve to ship.

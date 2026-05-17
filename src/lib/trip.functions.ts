@@ -166,6 +166,118 @@ export const geocode = createServerFn({ method: "POST" })
     };
   });
 
+// ---- AI booking parsers ----
+async function callAiJson(prompt: string, system: string): Promise<unknown> {
+  const key = process.env.LOVABLE_API_KEY;
+  if (!key) throw new Error("AI not configured");
+  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "google/gemini-2.5-flash",
+      messages: [{ role: "system", content: system }, { role: "user", content: prompt }],
+      response_format: { type: "json_object" },
+    }),
+  });
+  if (res.status === 429) throw new Error("AI rate limit — try again shortly");
+  if (res.status === 402) throw new Error("AI credits exhausted");
+  if (!res.ok) throw new Error(`AI error ${res.status}`);
+  const json = (await res.json()) as { choices: Array<{ message: { content: string } }> };
+  try { return JSON.parse(json.choices?.[0]?.message?.content ?? "{}"); } catch { return {}; }
+}
+
+export const parseFlightText = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({ text: z.string().min(3).max(8000) }))
+  .handler(async ({ data }) => {
+    const parsed = await callAiJson(
+      `Extract flight details from this text. Return strict JSON with keys:
+{ "airline": string|null, "flight_number": string|null, "scheduled_at": ISO8601 string|null (arrival time if both, else departure), "origin_iata": 3-letter|null, "destination_iata": 3-letter|null, "confidence": "high"|"medium"|"low" }
+If only a booking reference is given without flight info, return confidence "low" and fill what you can.
+Text:
+"""${data.text}"""`,
+      "You are a precise travel data extractor. Reply with strict JSON only. Use null for unknown fields. Never invent flight numbers or times.",
+    ) as Record<string, unknown>;
+    return {
+      airline: (parsed.airline as string) ?? null,
+      flight_number: (parsed.flight_number as string) ?? null,
+      scheduled_at: (parsed.scheduled_at as string) ?? null,
+      origin_iata: (parsed.origin_iata as string) ?? null,
+      destination_iata: (parsed.destination_iata as string) ?? null,
+      confidence: ((parsed.confidence as string) ?? "low") as "high" | "medium" | "low",
+    };
+  });
+
+export const parseStayText = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({ text: z.string().min(3).max(8000) }))
+  .handler(async ({ data }) => {
+    // Detect URL + source from raw text first
+    let booking_url: string | null = null;
+    let booking_source: string | null = null;
+    const urlMatch = data.text.match(/https?:\/\/[^\s)]+/);
+    if (urlMatch) {
+      booking_url = urlMatch[0];
+      try {
+        const host = new URL(booking_url).hostname.replace(/^www\./, "");
+        if (host.includes("airbnb")) booking_source = "airbnb";
+        else if (host.includes("booking")) booking_source = "booking";
+        else if (host.includes("agoda")) booking_source = "agoda";
+        else if (host.includes("expedia")) booking_source = "expedia";
+        else if (host.includes("vrbo")) booking_source = "vrbo";
+        else if (host.includes("trivago")) booking_source = "trivago";
+        else if (host.includes("hotels.com")) booking_source = "hotels";
+        else booking_source = "other";
+      } catch { /* ignore */ }
+    }
+    const parsed = await callAiJson(
+      `Extract accommodation booking details. Return strict JSON:
+{ "name": string|null, "address": string|null (full street address), "check_in": "YYYY-MM-DD"|null, "check_out": "YYYY-MM-DD"|null, "lat": number|null, "lng": number|null, "confidence": "high"|"medium"|"low" }
+Text:
+"""${data.text}"""`,
+      "You are a precise travel data extractor. Reply with strict JSON only. Use null for unknown fields. Never invent addresses.",
+    ) as Record<string, unknown>;
+    return {
+      name: (parsed.name as string) ?? null,
+      address: (parsed.address as string) ?? null,
+      check_in: (parsed.check_in as string) ?? null,
+      check_out: (parsed.check_out as string) ?? null,
+      lat: typeof parsed.lat === "number" ? parsed.lat : null,
+      lng: typeof parsed.lng === "number" ? parsed.lng : null,
+      booking_url,
+      booking_source,
+      confidence: ((parsed.confidence as string) ?? "low") as "high" | "medium" | "low",
+    };
+  });
+
+// ---- Group chat ----
+export const listMessages = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const { data: profile } = await supabase.from("profiles").select("trip_id").eq("id", userId).maybeSingle();
+    if (!profile?.trip_id) return { messages: [] };
+    const { data } = await supabase
+      .from("messages")
+      .select("id, trip_id, user_id, body, created_at")
+      .eq("trip_id", profile.trip_id)
+      .order("created_at", { ascending: true })
+      .limit(500);
+    return { messages: data ?? [] };
+  });
+
+export const sendMessage = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({ body: z.string().min(1).max(4000) }))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: profile } = await supabase.from("profiles").select("trip_id").eq("id", userId).maybeSingle();
+    if (!profile?.trip_id) throw new Error("Join a trip first");
+    const { error } = await supabase.from("messages").insert({ trip_id: profile.trip_id, user_id: userId, body: data.body });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
 // ---- AI Itinerary suggestions ----
 export const suggestItinerary = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
