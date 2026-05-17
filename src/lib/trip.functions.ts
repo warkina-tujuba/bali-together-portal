@@ -542,14 +542,17 @@ export const saveItineraryDays = createServerFn({ method: "POST" })
     const { data: profile } = await supabaseAdmin.from("profiles").select("trip_id").eq("id", userId).maybeSingle();
     if (!profile?.trip_id) throw new Error("No trip");
     if (data.days.length === 0) return { ok: true };
+    const tripId = profile.trip_id;
     const rows = data.days.map((d, i) => ({
-      trip_id: profile.trip_id,
+      trip_id: tripId,
       day_date: d.date,
       title: d.title,
       summary: d.summary ?? null,
       sort_index: i,
     }));
-    const { error } = await supabaseAdmin.from("itinerary_days").upsert(rows, { onConflict: "trip_id,day_date" });
+    // Replace existing days for this trip with the fresh AI draft
+    await supabaseAdmin.from("itinerary_days").delete().eq("trip_id", tripId);
+    const { error } = await supabaseAdmin.from("itinerary_days").insert(rows);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
