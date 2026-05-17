@@ -257,3 +257,24 @@ export const adminBecomeAdmin = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+export const setTripWhatsApp = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({ whatsapp_invite_url: z.string().url().max(500) }))
+  .handler(async ({ data, context }) => {
+    const { userId } = context;
+    const { data: role } = await supabaseAdmin.from("user_roles").select("role").eq("user_id", userId).eq("role", "admin").maybeSingle();
+    if (!role) throw new Error("Forbidden — host only");
+    const { data: trip } = await supabaseAdmin.from("trips").select("id").eq("is_active", true).limit(1).maybeSingle();
+    if (!trip) throw new Error("No active trip");
+    const { error } = await supabaseAdmin.from("trips").update({ whatsapp_invite_url: data.whatsapp_invite_url }).eq("id", trip.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const isAdmin = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data } = await supabaseAdmin.from("user_roles").select("role").eq("user_id", context.userId).eq("role", "admin").maybeSingle();
+    return { admin: !!data };
+  });
