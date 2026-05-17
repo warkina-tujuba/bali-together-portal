@@ -69,6 +69,18 @@ export function FlightDialog({ trigger, initial }: { trigger: React.ReactNode; i
           <DialogTitle className="font-display text-2xl">Your flight</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
+          <FlightLookupForm
+            onFound={(r) => {
+              if (r.airline) setAirline(r.airline);
+              setFn(r.flight_number);
+              if (r.scheduled_at) {
+                const dt = new Date(r.scheduled_at);
+                if (!isNaN(dt.getTime())) setAt(new Date(dt.getTime() - dt.getTimezoneOffset() * 60000).toISOString().slice(0, 16));
+              }
+              if (r.origin_iata) setO(r.origin_iata);
+              if (r.destination_iata) setD(r.destination_iata);
+            }}
+          />
           {logo && (
             <div className="flex items-center gap-3 rounded-xl bg-secondary p-3">
               <img src={logo} alt={airline || iata || "Airline"} className="h-10 w-10 rounded bg-white object-contain p-1" />
