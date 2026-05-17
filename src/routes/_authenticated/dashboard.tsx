@@ -49,8 +49,8 @@ function Dashboard() {
     <div className="mx-auto max-w-md p-6">
       <Card className="rounded-3xl border-0 p-7 shadow-card">
         <h2 className="font-display text-3xl">No trip yet</h2>
-        <p className="mt-2 text-muted-foreground">You're not linked to a trip — paste your invite code.</p>
-        <Link to="/" className="mt-5 inline-block rounded-full bg-primary px-5 py-2.5 text-sm text-primary-foreground">Enter code</Link>
+        <p className="mt-2 text-muted-foreground">Start a new trip or paste a magic link to join one.</p>
+        <Link to="/choose" className="mt-5 inline-block rounded-full bg-primary px-5 py-2.5 text-sm text-primary-foreground">Get started</Link>
       </Card>
     </div>
   );
