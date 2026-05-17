@@ -17,6 +17,8 @@ export type Database = {
       accommodations: {
         Row: {
           address: string | null
+          booking_source: string | null
+          booking_url: string | null
           check_in: string | null
           check_out: string | null
           created_at: string
@@ -32,6 +34,8 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          booking_source?: string | null
+          booking_url?: string | null
           check_in?: string | null
           check_out?: string | null
           created_at?: string
@@ -47,6 +51,8 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          booking_source?: string | null
+          booking_url?: string | null
           check_in?: string | null
           check_out?: string | null
           created_at?: string
@@ -123,6 +129,7 @@ export type Database = {
       flights: {
         Row: {
           airline: string | null
+          airline_iata: string | null
           created_at: string
           destination_city: string | null
           destination_iata: string | null
@@ -140,6 +147,7 @@ export type Database = {
         }
         Insert: {
           airline?: string | null
+          airline_iata?: string | null
           created_at?: string
           destination_city?: string | null
           destination_iata?: string | null
@@ -157,6 +165,7 @@ export type Database = {
         }
         Update: {
           airline?: string | null
+          airline_iata?: string | null
           created_at?: string
           destination_city?: string | null
           destination_iata?: string | null

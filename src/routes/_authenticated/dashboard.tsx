@@ -2,11 +2,16 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { getDashboard, suggestItinerary, updateProfile } from "@/lib/trip.functions";
+import { getDashboard, suggestItinerary, updateProfile, isAdmin as isAdminFn } from "@/lib/trip.functions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Plane, Home, MessageCircle, Sparkles, Send, CheckCircle2, AlertCircle, Users } from "lucide-react";
+import { FlightDialog } from "@/components/trip/FlightDialog";
+import { StayDialog } from "@/components/trip/StayDialog";
+import { WhatsAppDialog } from "@/components/trip/WhatsAppDialog";
+import { airlineLogoUrl, parseAirlineCode } from "@/lib/airline";
+import { bookingSourceMeta } from "@/lib/booking-source";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({ component: Dashboard });
 
@@ -14,8 +19,10 @@ function Dashboard() {
   const fn = useServerFn(getDashboard);
   const aiFn = useServerFn(suggestItinerary);
   const updFn = useServerFn(updateProfile);
+  const adminCheck = useServerFn(isAdminFn);
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["dashboard"], queryFn: () => fn() });
+  const { data: adminData } = useQuery({ queryKey: ["isAdmin"], queryFn: () => adminCheck() });
   const [aiDays, setAiDays] = useState<Array<{ date: string; title: string; items: string[] }> | null>(null);
 
   const aiMut = useMutation({
@@ -39,6 +46,7 @@ function Dashboard() {
   const start = new Date(trip.start_date);
   const end = new Date(trip.end_date);
   const days = Math.max(0, Math.ceil((start.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+  const isAdmin = !!adminData?.admin;
 
   const myFlight = data.flights.find((f) => f.user_id === data.profile?.id);
   const myStay = data.stays.find((s) => s.user_id === data.profile?.id);
@@ -76,12 +84,52 @@ function Dashboard() {
       </Card>
 
       {/* Reminder banners */}
-      {!myFlight && <Banner tone="warn" text="Your flight isn't confirmed yet — add it so the crew can see arrivals." actionTo="/onboarding" actionLabel="Add flight" />}
-      {!myStay && <Banner tone="warn" text="Your accommodation isn't confirmed yet — pin it on the map." actionTo="/onboarding" actionLabel="Add stay" />}
-      {!waJoined && <Banner tone="info" text="Join the WhatsApp group for real-time updates." actionLabel="Mark joined" onClick={async () => { await updFn({ data: { whatsapp_joined: true } }); qc.invalidateQueries({ queryKey: ["dashboard"] }); }} />}
+      {!myFlight && (
+        <FlightDialog
+          trigger={
+            <button className="mt-4 flex w-full flex-col items-start justify-between gap-2 rounded-2xl bg-primary/10 px-4 py-3 text-left sm:flex-row sm:items-center">
+              <div className="flex items-start gap-2 text-sm">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                <span>Your flight isn't confirmed yet — add it so the crew can see arrivals.</span>
+              </div>
+              <span className="shrink-0 text-sm font-medium text-primary">Add flight →</span>
+            </button>
+          }
+        />
+      )}
+      {!myStay && (
+        <StayDialog
+          trigger={
+            <button className="mt-4 flex w-full flex-col items-start justify-between gap-2 rounded-2xl bg-primary/10 px-4 py-3 text-left sm:flex-row sm:items-center">
+              <div className="flex items-start gap-2 text-sm">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                <span>Your accommodation isn't confirmed yet — pin it on the map.</span>
+              </div>
+              <span className="shrink-0 text-sm font-medium text-primary">Add stay →</span>
+            </button>
+          }
+        />
+      )}
+      {!waJoined && (
+        <WhatsAppDialog
+          isAdmin={isAdmin}
+          inviteUrl={trip.whatsapp_invite_url ?? null}
+          joined={waJoined}
+          tripName={trip.name}
+          trigger={
+            <button className="mt-4 flex w-full flex-col items-start justify-between gap-2 rounded-2xl bg-secondary px-4 py-3 text-left sm:flex-row sm:items-center">
+              <div className="flex items-start gap-2 text-sm">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                <span>Join the WhatsApp group for real-time updates.</span>
+              </div>
+              <span className="shrink-0 text-sm font-medium text-primary">Connect →</span>
+            </button>
+          }
+        />
+      )}
 
       <div className="mt-5 grid gap-5 lg:grid-cols-3">
-        {/* Profile checklist — Facebook-event style */}
+        {/* Profile checklist */}
         <Card className="rounded-3xl border-0 p-6 shadow-soft lg:col-span-2">
           <div className="flex items-center justify-between">
             <div>
@@ -92,40 +140,61 @@ function Dashboard() {
           </div>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <StatusTile
-              icon={<Plane className="h-5 w-5" />}
-              title="Flight"
-              status={myFlight ? `${myFlight.airline ?? ""} ${myFlight.flight_number}` : "Not yet confirmed"}
-              done={!!myFlight}
-              to="/onboarding"
-              cta={myFlight ? "Edit" : "Add"}
+            <FlightDialog
+              initial={myFlight ?? undefined}
+              trigger={
+                <button className="w-full text-left">
+                  <StatusTile
+                    icon={<Plane className="h-5 w-5" />}
+                    title="Flight"
+                    status={myFlight ? `${myFlight.airline ?? ""} ${myFlight.flight_number}` : "Not yet confirmed"}
+                    done={!!myFlight}
+                    logo={myFlight ? airlineLogoUrl(myFlight.airline_iata ?? parseAirlineCode(myFlight.flight_number) ?? "") : undefined}
+                    cta={myFlight ? "Edit" : "Add"}
+                  />
+                </button>
+              }
             />
-            <StatusTile
-              icon={<Home className="h-5 w-5" />}
-              title="Accommodation"
-              status={myStay ? myStay.name : "Not yet confirmed"}
-              done={!!myStay}
-              to="/onboarding"
-              cta={myStay ? "Edit" : "Add"}
+            <StayDialog
+              initial={myStay ?? undefined}
+              trigger={
+                <button className="w-full text-left">
+                  <StatusTile
+                    icon={<Home className="h-5 w-5" />}
+                    title="Accommodation"
+                    status={myStay ? `${myStay.name}${myStay.booking_source ? ` • ${bookingSourceMeta(myStay.booking_source).label}` : ""}` : "Not yet confirmed"}
+                    done={!!myStay}
+                    cta={myStay ? "Edit" : "Add"}
+                  />
+                </button>
+              }
             />
-            <StatusTile
-              icon={<MessageCircle className="h-5 w-5" />}
-              title="WhatsApp group"
-              status={waJoined ? "Joined" : "Not yet connected"}
-              done={waJoined}
-              href={trip.whatsapp_invite_url ?? undefined}
-              cta={waJoined ? "Open" : "Join"}
-              onCta={!waJoined ? async () => { await updFn({ data: { whatsapp_joined: true } }); qc.invalidateQueries({ queryKey: ["dashboard"] }); } : undefined}
+            <WhatsAppDialog
+              isAdmin={isAdmin}
+              inviteUrl={trip.whatsapp_invite_url ?? null}
+              joined={waJoined}
+              tripName={trip.name}
+              trigger={
+                <button className="w-full text-left">
+                  <StatusTile
+                    icon={<MessageCircle className="h-5 w-5" />}
+                    title="WhatsApp group"
+                    status={waJoined ? "Joined" : trip.whatsapp_invite_url ? "Tap to join" : "Not yet connected"}
+                    done={waJoined}
+                    cta={waJoined ? "Open" : "Connect"}
+                  />
+                </button>
+              }
             />
-            <StatusTile
-              icon={<Sparkles className="h-5 w-5" />}
-              title="AI itinerary"
-              status={aiDays ? `${aiDays.length} days drafted` : "Tap to generate"}
-              done={!!aiDays}
-              cta={aiMut.isPending ? "Thinking…" : (aiDays ? "Regenerate" : "Generate")}
-              onCta={() => aiMut.mutate()}
-              disabled={aiMut.isPending}
-            />
+            <button className="w-full text-left" onClick={() => aiMut.mutate()} disabled={aiMut.isPending}>
+              <StatusTile
+                icon={<Sparkles className="h-5 w-5" />}
+                title="AI itinerary"
+                status={aiDays ? `${aiDays.length} days drafted` : "Tap to generate"}
+                done={!!aiDays}
+                cta={aiMut.isPending ? "Thinking…" : (aiDays ? "Regenerate" : "Generate")}
+              />
+            </button>
           </div>
 
           {/* AI output */}
@@ -153,9 +222,21 @@ function Dashboard() {
                 <p className="font-display text-lg">{allReady ? "You're ready to send the magic link" : "Almost ready"}</p>
                 <p className="text-sm text-muted-foreground">{allReady ? "Invite the crew with one tap." : "Finish the checklist above to unlock."}</p>
               </div>
-              <Link to="/admin">
-                <Button disabled={!allReady} className="h-11 rounded-xl px-5"><Send className="mr-2 h-4 w-4" />Send magic link</Button>
-              </Link>
+              {isAdmin ? (
+                <WhatsAppDialog
+                  isAdmin={isAdmin}
+                  inviteUrl={trip.whatsapp_invite_url ?? null}
+                  joined={waJoined}
+                  tripName={trip.name}
+                  trigger={
+                    <Button disabled={!allReady} className="h-11 rounded-xl px-5"><Send className="mr-2 h-4 w-4" />Send magic link</Button>
+                  }
+                />
+              ) : (
+                <Link to="/admin">
+                  <Button disabled={!allReady} className="h-11 rounded-xl px-5"><Send className="mr-2 h-4 w-4" />Send magic link</Button>
+                </Link>
+              )}
             </div>
           </div>
         </Card>
@@ -188,79 +269,78 @@ function Dashboard() {
           <h3 className="font-display text-xl">Flight board</h3>
           <ul className="mt-3 divide-y divide-border">
             {data.flights.length === 0 && <li className="py-3 text-sm text-muted-foreground">No flights yet.</li>}
-            {data.flights.map((f) => (
-              <li key={f.id} className="flex items-center justify-between gap-3 py-3">
-                <div className="min-w-0">
-                  <p className="truncate font-medium">{f.airline ?? "Flight"} {f.flight_number}</p>
-                  <p className="text-xs text-muted-foreground">{f.origin_iata ?? "—"} → {f.destination_iata ?? "DPS"}</p>
-                </div>
-                <p className="shrink-0 text-sm tabular-nums">{f.scheduled_at ? new Date(f.scheduled_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}</p>
-              </li>
-            ))}
+            {data.flights.map((f) => {
+              const code = f.airline_iata ?? parseAirlineCode(f.flight_number);
+              return (
+                <li key={f.id} className="flex items-center gap-3 py-3">
+                  {code ? (
+                    <img
+                      src={airlineLogoUrl(code)}
+                      alt={f.airline ?? code}
+                      className="h-9 w-9 shrink-0 rounded bg-white object-contain p-0.5"
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = "hidden"; }}
+                    />
+                  ) : <div className="h-9 w-9 shrink-0 rounded bg-secondary" />}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{f.airline ?? "Flight"} {f.flight_number}</p>
+                    <p className="text-xs text-muted-foreground">{f.origin_iata ?? "—"} → {f.destination_iata ?? "DPS"}</p>
+                  </div>
+                  <p className="shrink-0 text-sm tabular-nums">{f.scheduled_at ? new Date(f.scheduled_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}</p>
+                </li>
+              );
+            })}
           </ul>
         </Card>
 
-        <Link to="/map" className="block">
-          <Card className="h-full rounded-3xl border-0 p-6 shadow-soft">
-            <div className="flex items-center justify-between">
-              <h3 className="font-display text-xl">Stay map</h3>
-              <span className="text-xs text-primary">Open →</span>
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">{data.stays.length} villas pinned</p>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              {data.stays.slice(0, 4).map((s) => (
-                <div key={s.id} className="rounded-2xl bg-secondary p-3">
-                  <p className="line-clamp-1 text-sm font-medium">{s.name}</p>
-                  <p className="line-clamp-1 text-xs text-muted-foreground">{s.address}</p>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </Link>
+        <Card className="rounded-3xl border-0 p-6 shadow-soft">
+          <div className="flex items-center justify-between">
+            <h3 className="font-display text-xl">Stay board</h3>
+            <Link to="/map" className="text-xs text-primary">Map →</Link>
+          </div>
+          <ul className="mt-3 space-y-2">
+            {data.stays.length === 0 && <li className="text-sm text-muted-foreground">No stays yet.</li>}
+            {data.stays.map((s) => {
+              const meta = s.booking_source ? bookingSourceMeta(s.booking_source) : null;
+              return (
+                <li key={s.id} className="flex items-center justify-between gap-3 rounded-2xl bg-secondary p-3">
+                  <div className="min-w-0">
+                    <p className="line-clamp-1 text-sm font-medium">{s.name}</p>
+                    <p className="line-clamp-1 text-xs text-muted-foreground">{s.address}</p>
+                  </div>
+                  {meta && (
+                    s.booking_url ? (
+                      <a href={s.booking_url} target="_blank" rel="noreferrer" className="shrink-0 rounded-full bg-background px-2.5 py-1 text-xs font-medium">
+                        {meta.emoji} {meta.label}
+                      </a>
+                    ) : (
+                      <span className="shrink-0 rounded-full bg-background px-2.5 py-1 text-xs font-medium">{meta.emoji} {meta.label}</span>
+                    )
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
       </div>
     </main>
   );
 }
 
-function Banner({ tone, text, actionTo, actionLabel, onClick }: { tone: "warn" | "info"; text: string; actionTo?: string; actionLabel?: string; onClick?: () => void }) {
-  const bg = tone === "warn" ? "bg-primary/10 text-foreground" : "bg-secondary text-foreground";
-  return (
-    <div className={`mt-4 flex flex-col items-start justify-between gap-2 rounded-2xl px-4 py-3 sm:flex-row sm:items-center ${bg}`}>
-      <div className="flex items-start gap-2 text-sm">
-        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-        <span>{text}</span>
-      </div>
-      {actionLabel && (
-        actionTo ? (
-          <Link to={actionTo} className="shrink-0 text-sm font-medium text-primary">{actionLabel} →</Link>
-        ) : (
-          <button onClick={onClick} className="shrink-0 text-sm font-medium text-primary">{actionLabel} →</button>
-        )
-      )}
-    </div>
-  );
-}
-
-function StatusTile({ icon, title, status, done, to, href, cta, onCta, disabled }: {
-  icon: React.ReactNode; title: string; status: string; done: boolean;
-  to?: string; href?: string; cta: string; onCta?: () => void; disabled?: boolean;
+function StatusTile({ icon, title, status, done, cta, logo }: {
+  icon: React.ReactNode; title: string; status: string; done: boolean; cta: string; logo?: string;
 }) {
-  const Action = () => {
-    if (onCta) return <Button size="sm" variant="secondary" disabled={disabled} onClick={onCta} className="rounded-lg">{cta}</Button>;
-    if (href) return <a href={href} target="_blank" rel="noreferrer"><Button size="sm" variant="secondary" className="rounded-lg">{cta}</Button></a>;
-    if (to) return <Link to={to}><Button size="sm" variant="secondary" className="rounded-lg">{cta}</Button></Link>;
-    return null;
-  };
   return (
     <div className={`flex items-center gap-3 rounded-2xl border p-4 ${done ? "border-primary/30 bg-primary/5" : "border-border bg-background"}`}>
-      <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${done ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground"}`}>
-        {done ? <CheckCircle2 className="h-5 w-5" /> : icon}
+      <div className={`flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl ${done ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground"}`}>
+        {logo ? (
+          <img src={logo} alt="" className="h-9 w-9 rounded bg-white object-contain p-0.5" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+        ) : done ? <CheckCircle2 className="h-5 w-5" /> : icon}
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium">{title}</p>
         <p className="truncate text-xs text-muted-foreground">{status}</p>
       </div>
-      <Action />
+      <span className="shrink-0 rounded-lg bg-secondary px-2.5 py-1 text-xs font-medium">{cta}</span>
     </div>
   );
 }
