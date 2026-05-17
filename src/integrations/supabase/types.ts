@@ -339,6 +339,7 @@ export type Database = {
         Row: {
           cover_image_url: string | null
           created_at: string
+          description: string | null
           destination: string
           end_date: string
           id: string
@@ -347,6 +348,7 @@ export type Database = {
           map_center_lng: number | null
           map_default_zoom: number | null
           name: string
+          occasion: string | null
           start_date: string
           updated_at: string
           whatsapp_invite_url: string | null
@@ -354,6 +356,7 @@ export type Database = {
         Insert: {
           cover_image_url?: string | null
           created_at?: string
+          description?: string | null
           destination: string
           end_date: string
           id?: string
@@ -362,6 +365,7 @@ export type Database = {
           map_center_lng?: number | null
           map_default_zoom?: number | null
           name: string
+          occasion?: string | null
           start_date: string
           updated_at?: string
           whatsapp_invite_url?: string | null
@@ -369,6 +373,7 @@ export type Database = {
         Update: {
           cover_image_url?: string | null
           created_at?: string
+          description?: string | null
           destination?: string
           end_date?: string
           id?: string
@@ -377,6 +382,7 @@ export type Database = {
           map_center_lng?: number | null
           map_default_zoom?: number | null
           name?: string
+          occasion?: string | null
           start_date?: string
           updated_at?: string
           whatsapp_invite_url?: string | null
