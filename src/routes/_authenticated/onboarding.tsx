@@ -33,10 +33,8 @@ function Onboarding() {
   const acceptFn = useServerFn(acceptInvite);
   const dashFn = useServerFn(getDashboard);
   const updateFn = useServerFn(updateProfile);
-  const flightFn = useServerFn(saveFlight);
   const stayFn = useServerFn(saveAccommodation);
   const geoFn = useServerFn(geocode);
-  const parseFlight = useServerFn(parseFlightText);
   const parseStay = useServerFn(parseStayText);
 
   const { data, isLoading, refetch } = useQuery({ queryKey: ["dashboard"], queryFn: () => dashFn() });
