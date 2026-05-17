@@ -163,6 +163,53 @@ export const geocode = createServerFn({ method: "POST" })
     };
   });
 
+// ---- AI Itinerary suggestions ----
+export const suggestItinerary = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const { data: profile } = await supabase.from("profiles").select("trip_id").eq("id", userId).maybeSingle();
+    if (!profile?.trip_id) throw new Error("Join a trip first");
+    const [{ data: trip }, { data: stays }, { data: flights }] = await Promise.all([
+      supabase.from("trips").select("*").eq("id", profile.trip_id).maybeSingle(),
+      supabase.from("accommodations").select("name,address").eq("trip_id", profile.trip_id),
+      supabase.from("flights").select("scheduled_at,direction").eq("trip_id", profile.trip_id),
+    ]);
+    if (!trip) throw new Error("No trip");
+    const key = process.env.LOVABLE_API_KEY;
+    if (!key) throw new Error("AI not configured");
+    const prompt = `Plan a concise day-by-day itinerary for a group trip.
+Trip: ${trip.name} — ${trip.destination}
+Dates: ${trip.start_date} to ${trip.end_date}
+Accommodations: ${(stays ?? []).map((s) => `${s.name} (${s.address ?? ""})`).join("; ") || "TBD"}
+Arrivals: ${(flights ?? []).filter((f) => f.direction === "arrival").map((f) => f.scheduled_at).join(", ") || "TBD"}
+Return JSON: { "days": [ { "date": "YYYY-MM-DD", "title": "...", "items": ["morning ...", "afternoon ...", "evening ..."] } ] }
+Keep it grounded, local, and group-friendly. 3-5 items per day max.`;
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-3-flash-preview",
+        messages: [
+          { role: "system", content: "You are a thoughtful travel concierge. Reply with strict JSON only." },
+          { role: "user", content: prompt },
+        ],
+        response_format: { type: "json_object" },
+      }),
+    });
+    if (res.status === 429) throw new Error("AI rate limit — try again shortly");
+    if (res.status === 402) throw new Error("AI credits exhausted — add credits in workspace settings");
+    if (!res.ok) throw new Error(`AI error ${res.status}`);
+    const json = (await res.json()) as { choices: Array<{ message: { content: string } }> };
+    const content = json.choices?.[0]?.message?.content ?? "{}";
+    try {
+      const parsed = JSON.parse(content) as { days: Array<{ date: string; title: string; items: string[] }> };
+      return { days: parsed.days ?? [] };
+    } catch {
+      return { days: [] as Array<{ date: string; title: string; items: string[] }> };
+    }
+  });
+
 // ---- Admin ----
 export const adminListGuests = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
