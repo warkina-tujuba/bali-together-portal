@@ -14,16 +14,402 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      accommodations: {
+        Row: {
+          address: string | null
+          check_in: string | null
+          check_out: string | null
+          created_at: string
+          id: string
+          lat: number | null
+          lng: number | null
+          name: string
+          notes: string | null
+          place_id: string | null
+          trip_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address?: string | null
+          check_in?: string | null
+          check_out?: string | null
+          created_at?: string
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          name: string
+          notes?: string | null
+          place_id?: string | null
+          trip_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address?: string | null
+          check_in?: string | null
+          check_out?: string | null
+          created_at?: string
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          name?: string
+          notes?: string | null
+          place_id?: string | null
+          trip_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accommodations_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      activities: {
+        Row: {
+          cover_image_url: string | null
+          created_at: string
+          day_date: string
+          description: string | null
+          id: string
+          location: string | null
+          sort_index: number
+          start_time: string | null
+          tags: string[] | null
+          title: string
+          trip_id: string
+        }
+        Insert: {
+          cover_image_url?: string | null
+          created_at?: string
+          day_date: string
+          description?: string | null
+          id?: string
+          location?: string | null
+          sort_index?: number
+          start_time?: string | null
+          tags?: string[] | null
+          title: string
+          trip_id: string
+        }
+        Update: {
+          cover_image_url?: string | null
+          created_at?: string
+          day_date?: string
+          description?: string | null
+          id?: string
+          location?: string | null
+          sort_index?: number
+          start_time?: string | null
+          tags?: string[] | null
+          title?: string
+          trip_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activities_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flights: {
+        Row: {
+          airline: string | null
+          created_at: string
+          destination_city: string | null
+          destination_iata: string | null
+          direction: string
+          flight_number: string
+          id: string
+          origin_city: string | null
+          origin_iata: string | null
+          raw_api: Json | null
+          scheduled_at: string | null
+          status: string | null
+          trip_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          airline?: string | null
+          created_at?: string
+          destination_city?: string | null
+          destination_iata?: string | null
+          direction?: string
+          flight_number: string
+          id?: string
+          origin_city?: string | null
+          origin_iata?: string | null
+          raw_api?: Json | null
+          scheduled_at?: string | null
+          status?: string | null
+          trip_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          airline?: string | null
+          created_at?: string
+          destination_city?: string | null
+          destination_iata?: string | null
+          direction?: string
+          flight_number?: string
+          id?: string
+          origin_city?: string | null
+          origin_iata?: string | null
+          raw_api?: Json | null
+          scheduled_at?: string | null
+          status?: string | null
+          trip_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flights_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invites: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          email: string | null
+          full_name: string
+          id: string
+          token: string
+          trip_id: string
+          used_at: string | null
+          used_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          full_name: string
+          id?: string
+          token: string
+          trip_id: string
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          full_name?: string
+          id?: string
+          token?: string
+          trip_id?: string
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invites_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      itinerary_days: {
+        Row: {
+          cover_image_url: string | null
+          created_at: string
+          day_date: string
+          id: string
+          sort_index: number
+          summary: string | null
+          title: string
+          trip_id: string
+        }
+        Insert: {
+          cover_image_url?: string | null
+          created_at?: string
+          day_date: string
+          id?: string
+          sort_index?: number
+          summary?: string | null
+          title: string
+          trip_id: string
+        }
+        Update: {
+          cover_image_url?: string | null
+          created_at?: string
+          day_date?: string
+          id?: string
+          sort_index?: number
+          summary?: string | null
+          title?: string
+          trip_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "itinerary_days_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          dietary: string | null
+          email: string | null
+          full_name: string | null
+          id: string
+          notes: string | null
+          onboarding_complete: boolean
+          onboarding_step: number
+          phone: string | null
+          room_preference: string | null
+          trip_id: string | null
+          updated_at: string
+          whatsapp_joined_at: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          dietary?: string | null
+          email?: string | null
+          full_name?: string | null
+          id: string
+          notes?: string | null
+          onboarding_complete?: boolean
+          onboarding_step?: number
+          phone?: string | null
+          room_preference?: string | null
+          trip_id?: string | null
+          updated_at?: string
+          whatsapp_joined_at?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          dietary?: string | null
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          notes?: string | null
+          onboarding_complete?: boolean
+          onboarding_step?: number
+          phone?: string | null
+          room_preference?: string | null
+          trip_id?: string | null
+          updated_at?: string
+          whatsapp_joined_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trips: {
+        Row: {
+          cover_image_url: string | null
+          created_at: string
+          destination: string
+          end_date: string
+          id: string
+          is_active: boolean
+          map_center_lat: number | null
+          map_center_lng: number | null
+          map_default_zoom: number | null
+          name: string
+          start_date: string
+          updated_at: string
+          whatsapp_invite_url: string | null
+        }
+        Insert: {
+          cover_image_url?: string | null
+          created_at?: string
+          destination: string
+          end_date: string
+          id?: string
+          is_active?: boolean
+          map_center_lat?: number | null
+          map_center_lng?: number | null
+          map_default_zoom?: number | null
+          name: string
+          start_date: string
+          updated_at?: string
+          whatsapp_invite_url?: string | null
+        }
+        Update: {
+          cover_image_url?: string | null
+          created_at?: string
+          destination?: string
+          end_date?: string
+          id?: string
+          is_active?: boolean
+          map_center_lat?: number | null
+          map_center_lng?: number | null
+          map_default_zoom?: number | null
+          name?: string
+          start_date?: string
+          updated_at?: string
+          whatsapp_invite_url?: string | null
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "guest"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +536,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "guest"],
+    },
   },
 } as const
