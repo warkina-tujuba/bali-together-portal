@@ -3,8 +3,8 @@ import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  acceptInvite, getDashboard, updateProfile, saveFlight, saveAccommodation,
-  geocode, parseFlightText, parseStayText,
+  acceptInvite, getDashboard, updateProfile, saveAccommodation,
+  geocode, parseStayText,
 } from "@/lib/trip.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,8 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { AvatarPicker } from "@/components/trip/AvatarPicker";
-import { FlightPasteForm } from "@/components/trip/FlightPasteForm";
-import { FlightManualForm } from "@/components/trip/FlightManualForm";
+import { FlightSmartForm } from "@/components/trip/FlightSmartForm";
 import { StayPasteForm } from "@/components/trip/StayPasteForm";
 import { StaySearchForm } from "@/components/trip/StaySearchForm";
 import { toast } from "sonner";
@@ -34,10 +33,8 @@ function Onboarding() {
   const acceptFn = useServerFn(acceptInvite);
   const dashFn = useServerFn(getDashboard);
   const updateFn = useServerFn(updateProfile);
-  const flightFn = useServerFn(saveFlight);
   const stayFn = useServerFn(saveAccommodation);
   const geoFn = useServerFn(geocode);
-  const parseFlight = useServerFn(parseFlightText);
   const parseStay = useServerFn(parseStayText);
 
   const { data, isLoading, refetch } = useQuery({ queryKey: ["dashboard"], queryFn: () => dashFn() });
@@ -105,21 +102,14 @@ function Onboarding() {
         <Card className="rounded-3xl border-0 p-7 shadow-card">
           <h2 className="font-display text-3xl">Your arrival flight</h2>
           <p className="mt-2 text-sm text-muted-foreground">So the crew can see everyone landing on one board.</p>
-          <Tabs defaultValue="paste" className="mt-5">
-            <TabsList className="grid w-full grid-cols-2 rounded-xl">
-              <TabsTrigger value="paste" className="rounded-lg">Paste booking</TabsTrigger>
-              <TabsTrigger value="manual" className="rounded-lg">Add manually</TabsTrigger>
-            </TabsList>
-            <TabsContent value="paste" className="mt-4">
-              <FlightPasteForm
-                parse={parseFlight}
-                onSave={async (f) => { await flightFn({ data: f }); await advance(3); }}
-              />
-            </TabsContent>
-            <TabsContent value="manual" className="mt-4">
-              <FlightManualForm onSave={async (f) => { await flightFn({ data: f }); await advance(3); }} />
-            </TabsContent>
-          </Tabs>
+          <div className="mt-5">
+            <FlightSmartForm
+              defaultDate={data?.trip?.start_date ?? null}
+              onSaved={async () => { await advance(3); }}
+              ctaLabel="Save & continue"
+            />
+            <button onClick={() => advance(3)} className="mt-3 w-full text-center text-xs text-muted-foreground">Skip for now →</button>
+          </div>
         </Card>
       )}
 

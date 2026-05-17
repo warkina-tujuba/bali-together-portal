@@ -97,6 +97,7 @@ function Dashboard() {
       {/* Reminder banners */}
       {!myFlight && (
         <FlightDialog
+          defaultDate={data.trip?.start_date ?? null}
           trigger={
             <button className="mt-4 flex w-full flex-col items-start justify-between gap-2 rounded-2xl bg-primary/10 px-4 py-3 text-left sm:flex-row sm:items-center">
               <div className="flex items-start gap-2 text-sm">
@@ -152,6 +153,7 @@ function Dashboard() {
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
             <FlightDialog
               initial={myFlight ?? undefined}
+              defaultDate={data.trip?.start_date ?? null}
               trigger={
                 <button className="w-full text-left">
                   <StatusTile
