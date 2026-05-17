@@ -18,22 +18,20 @@ export const Route = createFileRoute("/_authenticated/dashboard")({ component: D
 
 function Dashboard() {
   const fn = useServerFn(getDashboard);
-  const aiFn = useServerFn(suggestItinerary);
   const updFn = useServerFn(updateProfile);
   const adminCheck = useServerFn(isAdminFn);
   const magicFn = useServerFn(createMagicLink);
+  const agendaFn = useServerFn(listAgenda);
+  const msgsFn = useServerFn(listMessages);
+  void updFn;
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["dashboard"], queryFn: () => fn() });
   const { data: adminData } = useQuery({ queryKey: ["isAdmin"], queryFn: () => adminCheck() });
-  const [aiDays, setAiDays] = useState<Array<{ date: string; title: string; items: string[] }> | null>(null);
+  const { data: agenda } = useQuery({ queryKey: ["agenda"], queryFn: () => agendaFn() });
+  const { data: msgs } = useQuery({ queryKey: ["messages"], queryFn: () => msgsFn() });
+  void qc;
   const [magicUrl, setMagicUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-
-  const aiMut = useMutation({
-    mutationFn: () => aiFn(),
-    onSuccess: (r) => { setAiDays(r.days); toast.success("Itinerary drafted"); },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "AI failed"),
-  });
 
   async function copyMagic() {
     try {
