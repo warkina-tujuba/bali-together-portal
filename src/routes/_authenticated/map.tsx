@@ -94,9 +94,11 @@ function MapPage() {
       .filter((s) => s.lat != null && s.lng != null)
       .forEach((s) => {
         const member = memberById.get(s.user_id);
-        const el = makeAvatarEl(member?.full_name ?? "Guest", member?.avatar_url, false);
+        const el = document.createElement("div");
+        el.style.cssText = "width:40px;height:40px;border-radius:9999px;background:white;border:2px solid #D97757;display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 4px 14px rgba(0,0,0,.25);cursor:pointer;";
+        el.textContent = "🏠";
         const popup = new mapboxgl.Popup({ offset: 28 }).setHTML(
-          `<div style="font-family:system-ui;min-width:180px"><strong>${member?.full_name ?? "Guest"}</strong><div style="margin-top:4px">${s.name}</div><div style="opacity:.6;font-size:12px;margin-top:2px">${s.address ?? ""}</div>${s.booking_url ? `<a href="${s.booking_url}" target="_blank" style="display:inline-block;margin-top:6px;color:#D97757;font-size:12px">Open booking ↗</a>` : ""}</div>`,
+          `<div style="font-family:system-ui;min-width:180px"><strong>${member?.full_name ?? "Guest"}</strong>'s stay<div style="margin-top:4px">${s.name}</div><div style="opacity:.6;font-size:12px;margin-top:2px">${s.address ?? ""}</div>${s.booking_url ? `<a href="${s.booking_url}" target="_blank" style="display:inline-block;margin-top:6px;color:#D97757;font-size:12px">Open booking ↗</a>` : ""}</div>`,
         );
         const marker = new mapboxgl.Marker({ element: el })
           .setLngLat([s.lng!, s.lat!])
