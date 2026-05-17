@@ -251,7 +251,7 @@ function Dashboard() {
               <h2 className="font-display text-2xl">
                 {new Date(activeDay).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}
               </h2>
-              {isAdmin && <HostEventDialog defaultDate={activeDay} trigger={
+              {isAdmin && <HostEventDialog defaultDate={activeDay} tripDays={days} trigger={
                 <Button size="sm" variant="ghost" className="rounded-full"><Crown className="mr-1 h-3.5 w-3.5" />Host event</Button>
               } />}
             </div>
