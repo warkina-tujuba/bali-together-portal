@@ -571,30 +571,47 @@ export const lookupFlight = createServerFn({ method: "POST" })
     const key = process.env.AVIATIONSTACK_API_KEY;
     if (!key) throw new Error("Flight lookup not configured");
     const fnum = data.flight_number.replace(/\s+/g, "").toUpperCase();
-    const url = new URL("http://api.aviationstack.com/v1/flights");
+    // NOTE: AviationStack free tier rejects `flight_date`. We fetch the
+    // recent window for the flight number and (if a date was provided)
+    // pick the matching entry client-side, otherwise the most recent one
+    // — schedules repeat daily so departure/arrival times still match.
+    const url = new URL("https://api.aviationstack.com/v1/flights");
     url.searchParams.set("access_key", key);
     url.searchParams.set("flight_iata", fnum);
-    if (data.date) url.searchParams.set("flight_date", data.date);
-    url.searchParams.set("limit", "1");
+    url.searchParams.set("limit", "10");
     const res = await fetch(url.toString());
-    if (!res.ok) throw new Error(`Lookup failed (${res.status})`);
-    const json = (await res.json()) as { data?: Array<Record<string, unknown>> };
-    const f = json.data?.[0] as
-      | undefined
-      | {
-          airline?: { name?: string; iata?: string };
-          flight?: { iata?: string; number?: string };
-          departure?: { iata?: string; airport?: string; scheduled?: string };
-          arrival?: { iata?: string; airport?: string; scheduled?: string };
-          flight_status?: string;
-        };
-    if (!f) return { found: false as const };
+    const json = (await res.json()) as {
+      data?: Array<Record<string, unknown>>;
+      error?: { message?: string; code?: string };
+    };
+    if (json.error) {
+      console.error("AviationStack error", json.error);
+      return { found: false as const };
+    }
+    type Row = {
+      flight_date?: string;
+      airline?: { name?: string; iata?: string };
+      flight?: { iata?: string; number?: string };
+      departure?: { iata?: string; airport?: string; scheduled?: string };
+      arrival?: { iata?: string; airport?: string; scheduled?: string };
+      flight_status?: string;
+    };
+    const rows = (json.data ?? []) as Row[];
+    if (rows.length === 0) return { found: false as const };
+    const f =
+      (data.date && rows.find((r) => r.flight_date === data.date)) ||
+      rows[0];
     return {
       found: true as const,
       airline: f.airline?.name ?? null,
       airline_iata: f.airline?.iata ?? null,
       flight_number: f.flight?.iata ?? fnum,
-      scheduled_at: f.arrival?.scheduled ?? f.departure?.scheduled ?? null,
+      // If we had no exact-date match but the user supplied one, shift the
+      // canonical schedule onto that date so the UI shows their trip date.
+      scheduled_at: shiftToDate(
+        f.arrival?.scheduled ?? f.departure?.scheduled ?? null,
+        data.date && f.flight_date !== data.date ? data.date : null,
+      ),
       origin_iata: f.departure?.iata ?? null,
       origin_city: f.departure?.airport ?? null,
       destination_iata: f.arrival?.iata ?? null,
@@ -602,6 +619,15 @@ export const lookupFlight = createServerFn({ method: "POST" })
       status: f.flight_status ?? null,
     };
   });
+
+function shiftToDate(iso: string | null, targetDate: string | null): string | null {
+  if (!iso) return null;
+  if (!targetDate) return iso;
+  // Replace just the YYYY-MM-DD portion, keep time + offset.
+  const m = iso.match(/^(\d{4}-\d{2}-\d{2})(T.*)$/);
+  if (!m) return iso;
+  return `${targetDate}${m[2]}`;
+}
 
 // ============================================================
 // Events: rich add + RSVPs + agenda
