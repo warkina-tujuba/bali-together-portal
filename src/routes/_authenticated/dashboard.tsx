@@ -153,6 +153,7 @@ function Dashboard() {
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
             <FlightDialog
               initial={myFlight ?? undefined}
+              defaultDate={data.trip?.start_date ?? null}
               trigger={
                 <button className="w-full text-left">
                   <StatusTile
