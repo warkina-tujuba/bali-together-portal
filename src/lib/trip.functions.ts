@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { z } from "zod";
+import { planTrip, buildDaySummaries } from "@/lib/itinerary-planner";
 
 // ---- Public: accept invite token ----
 export const acceptInvite = createServerFn({ method: "POST" })
