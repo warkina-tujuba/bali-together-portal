@@ -18,6 +18,7 @@ import { Route as AuthenticatedMapRouteImport } from './routes/_authenticated/ma
 import { Route as AuthenticatedItineraryRouteImport } from './routes/_authenticated/itinerary'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated/chat'
+import { Route as AuthenticatedAgendaRouteImport } from './routes/_authenticated/agenda'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedTripNewRouteImport } from './routes/_authenticated/trip.new'
 
@@ -65,6 +66,11 @@ const AuthenticatedChatRoute = AuthenticatedChatRouteImport.update({
   path: '/chat',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedAgendaRoute = AuthenticatedAgendaRouteImport.update({
+  id: '/agenda',
+  path: '/agenda',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -81,6 +87,7 @@ export interface FileRoutesByFullPath {
   '/choose': typeof ChooseRoute
   '/login': typeof LoginRoute
   '/admin': typeof AuthenticatedAdminRoute
+  '/agenda': typeof AuthenticatedAgendaRoute
   '/chat': typeof AuthenticatedChatRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/itinerary': typeof AuthenticatedItineraryRoute
@@ -93,6 +100,7 @@ export interface FileRoutesByTo {
   '/choose': typeof ChooseRoute
   '/login': typeof LoginRoute
   '/admin': typeof AuthenticatedAdminRoute
+  '/agenda': typeof AuthenticatedAgendaRoute
   '/chat': typeof AuthenticatedChatRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/itinerary': typeof AuthenticatedItineraryRoute
@@ -107,6 +115,7 @@ export interface FileRoutesById {
   '/choose': typeof ChooseRoute
   '/login': typeof LoginRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
+  '/_authenticated/agenda': typeof AuthenticatedAgendaRoute
   '/_authenticated/chat': typeof AuthenticatedChatRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/itinerary': typeof AuthenticatedItineraryRoute
@@ -121,6 +130,7 @@ export interface FileRouteTypes {
     | '/choose'
     | '/login'
     | '/admin'
+    | '/agenda'
     | '/chat'
     | '/dashboard'
     | '/itinerary'
@@ -133,6 +143,7 @@ export interface FileRouteTypes {
     | '/choose'
     | '/login'
     | '/admin'
+    | '/agenda'
     | '/chat'
     | '/dashboard'
     | '/itinerary'
@@ -146,6 +157,7 @@ export interface FileRouteTypes {
     | '/choose'
     | '/login'
     | '/_authenticated/admin'
+    | '/_authenticated/agenda'
     | '/_authenticated/chat'
     | '/_authenticated/dashboard'
     | '/_authenticated/itinerary'
@@ -226,6 +238,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedChatRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/agenda': {
+      id: '/_authenticated/agenda'
+      path: '/agenda'
+      fullPath: '/agenda'
+      preLoaderRoute: typeof AuthenticatedAgendaRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/admin': {
       id: '/_authenticated/admin'
       path: '/admin'
@@ -245,6 +264,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
+  AuthenticatedAgendaRoute: typeof AuthenticatedAgendaRoute
   AuthenticatedChatRoute: typeof AuthenticatedChatRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedItineraryRoute: typeof AuthenticatedItineraryRoute
@@ -255,6 +275,7 @@ interface AuthenticatedRouteChildren {
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
+  AuthenticatedAgendaRoute: AuthenticatedAgendaRoute,
   AuthenticatedChatRoute: AuthenticatedChatRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedItineraryRoute: AuthenticatedItineraryRoute,
@@ -276,3 +297,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
