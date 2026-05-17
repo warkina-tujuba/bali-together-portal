@@ -778,12 +778,13 @@ export const getItineraryHome = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
     const { data: profile } = await supabase.from("profiles").select("trip_id").eq("id", userId).maybeSingle();
-    if (!profile?.trip_id) return { trip: null, activities: [], stays: [], rsvps: [], members: [] };
+    if (!profile?.trip_id) return { trip: null, activities: [], stays: [], flights: [], rsvps: [], members: [], userId };
     const tripId = profile.trip_id;
-    const [{ data: trip }, { data: activities }, { data: stays }, { data: rsvps }, { data: members }] = await Promise.all([
+    const [{ data: trip }, { data: activities }, { data: stays }, { data: flights }, { data: rsvps }, { data: members }] = await Promise.all([
       supabase.from("trips").select("*").eq("id", tripId).maybeSingle(),
       supabase.from("activities").select("*").eq("trip_id", tripId).order("day_date").order("is_host_event", { ascending: false }).order("start_time", { ascending: true, nullsFirst: true }),
       supabase.from("accommodations").select("*").eq("trip_id", tripId),
+      supabase.from("flights").select("*").eq("trip_id", tripId),
       supabase.from("event_rsvps").select("*").eq("trip_id", tripId),
       supabase.from("profiles").select("id, full_name, avatar_url").eq("trip_id", tripId),
     ]);
@@ -791,6 +792,7 @@ export const getItineraryHome = createServerFn({ method: "GET" })
       trip,
       activities: activities ?? [],
       stays: stays ?? [],
+      flights: flights ?? [],
       rsvps: rsvps ?? [],
       members: members ?? [],
       userId,
