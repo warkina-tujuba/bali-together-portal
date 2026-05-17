@@ -183,7 +183,7 @@ function Dashboard() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {isAdmin && <HostEventDialog defaultDate={activeDay} />}
+          {isAdmin && <HostEventDialog defaultDate={activeDay} tripDays={days} />}
           {isAdmin && (
             <Button variant="outline" className="rounded-full" onClick={copyMagic}>
               <Copy className="mr-2 h-4 w-4" /> Invite
