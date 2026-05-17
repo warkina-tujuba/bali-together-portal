@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { airlineLogoUrl, parseAirlineCode } from "@/lib/airline";
+import { FlightLookupForm } from "@/components/trip/FlightLookupForm";
 
 type Initial = {
   airline?: string | null;
