@@ -19,16 +19,30 @@ function Dashboard() {
   const aiFn = useServerFn(suggestItinerary);
   const updFn = useServerFn(updateProfile);
   const adminCheck = useServerFn(isAdminFn);
+  const magicFn = useServerFn(createMagicLink);
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["dashboard"], queryFn: () => fn() });
   const { data: adminData } = useQuery({ queryKey: ["isAdmin"], queryFn: () => adminCheck() });
   const [aiDays, setAiDays] = useState<Array<{ date: string; title: string; items: string[] }> | null>(null);
+  const [magicUrl, setMagicUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const aiMut = useMutation({
     mutationFn: () => aiFn(),
     onSuccess: (r) => { setAiDays(r.days); toast.success("Itinerary drafted"); },
     onError: (e) => toast.error(e instanceof Error ? e.message : "AI failed"),
   });
+
+  async function copyMagic() {
+    try {
+      const r = await magicFn({ data: { full_name: "Guest", max_uses: 50 } });
+      const url = `${window.location.origin}/?invite=${r.token}`;
+      setMagicUrl(url);
+      await navigator.clipboard.writeText(url).catch(() => {});
+      setCopied(true);
+      toast.success("Magic link copied!");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Couldn't create link"); }
+  }
 
   if (isLoading || !data) return <div className="p-10 text-center text-muted-foreground">Loading…</div>;
   if (!data.trip) return (
