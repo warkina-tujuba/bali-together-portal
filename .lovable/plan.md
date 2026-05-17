@@ -1,96 +1,56 @@
-# Trip Itinerary Portal — Build Plan
+# Bali Group Trip Portal — Free-API Build Plan
 
-A private, invite-only portal where guests onboard via magic link, register flights & accommodation, join the group WhatsApp, and see a shared map + itinerary. Mobile-first, Airbnb-style polish.  
-  
-We will begin by creating a test trip; "Warkina 30th Bali"
+Same product, design direction (Uluwatu Luxe), and DM Serif Display + Fira Sans typography as already approved. Only change: external APIs are swapped to **free, key-less** options.
 
-## Design system (locked)
+## API swaps (vs. original plan)
 
-- Palette: jungle `#1B2B21`, terracotta `#D97757`, sand `#F5F2ED`, paper `#FDFBFA`.
-- Fonts: **DM Serif Display** (headings) + **Fira Sans** (body).
-- Large rounded cards (rounded-2xl/3xl), soft shadows, image-led layouts, sticky bottom action bar on mobile.
-- Tokens defined in `src/styles.css` with `oklch` semantic vars; no hardcoded hex in components.
+| Need | Old (paid/key) | New (free, no key) |
+|---|---|---|
+| Map tiles | Mapbox GL JS + token | **Leaflet** + **OpenStreetMap** raster tiles |
+| Accommodation lookup | Mapbox Places | **Nominatim** (OSM geocoding, public endpoint) |
+| Flight lookup | AeroDataBox via RapidAPI | **Manual entry**, with a built-in slot for AviationStack later if desired |
 
-## Routes
+No secrets need to be added. Everything runs out of the box.
 
-```text
-/                    Invite landing (accepts ?token=…)
-/login               Magic-link request (fallback / re-entry)
-/onboarding          Wizard (5 steps) — _authenticated
-/dashboard           Guest dashboard — _authenticated
-/itinerary           Full day-by-day timeline — _authenticated
-/map                 Full-screen Mapbox stays view — _authenticated
-/admin               Host dashboard — _authenticated/_admin
-  /admin/invites     Create & revoke invites
-  /admin/itinerary   CRUD trip days, activities
-  /admin/guests      View all guests, flights, stays
-```
+### Why these are safe to use directly
 
-Architecture: TanStack Start file routes, `_authenticated` layout guard, `_admin` nested guard checking `user_roles`.
+- **OpenStreetMap tiles** — free for low/moderate use; we set a proper `User-Agent`-style attribution and reasonable zoom limits.
+- **Nominatim** — free public geocoder; we throttle queries (300ms debounce, min 3 chars), set a descriptive `Referer`, and call it from a server function so we control rate and can swap providers later without touching the UI.
+- **Leaflet** — MIT-licensed JS lib, installed via npm.
 
-## Onboarding wizard steps
+## Onboarding wizard (unchanged steps, free-API behavior)
 
 1. **Identify** — confirm name from invite.
 2. **Profile** — phone, dietary, room preference, avatar.
-3. **Flight** — airline + flight number + date → AeroDataBox lookup → confirm arrival time/airport.
-4. **Accommodation** — Mapbox Places autocomplete → pin location + nights.
-5. **WhatsApp** — deep link to the group invite (stored as admin setting), mark joined.
+3. **Flight** — guest enters airline, flight number, date, arrival airport, arrival time. Clean form, no lookup required. (Later we can wire an optional lookup behind a feature flag.)
+4. **Accommodation** — type a hotel/villa name or address → Nominatim suggestions → pick → we store name, address, lat, lng.
+5. **WhatsApp** — deep link to the trip's group invite (set by admin), mark joined.
 
-Each step writes to its respective table immediately so guests can resume.
+## Map experience
 
-## Backend (Lovable Cloud)
+- Group accommodation map uses **Leaflet** with OSM tiles, custom round terracotta pins for guest stays, popup with guest name + stay name.
+- Dashboard shows a small map preview; `/map` shows the full-screen version.
+- Default center comes from the trip row (Bali coords pre-seeded).
 
-**Auth**: Email magic link via Supabase. Invites carry a one-time token that, on accept, calls `/api/public/accept-invite` to bind the auth user to the invite row.
+## Everything else unchanged from approved plan
 
-**Tables** (RLS on, `user_roles` pattern for admin):
-
-- `invites` — id, token (unique), email, name, trip_id, used_at, created_by
-- `profiles` — id (= auth.users.id), full_name, phone, avatar_url, dietary, notes, whatsapp_joined_at
-- `user_roles` — id, user_id, role (`admin` | `guest`) — RLS via SECURITY DEFINER `has_role()`
-- `trips` — id, name, destination, start_date, end_date, whatsapp_invite_url, mapbox_default_center
-- `flights` — id, user_id, trip_id, airline, flight_number, scheduled_arrival, origin_iata, dest_iata, raw_api_json
-- `accommodations` — id, user_id, trip_id, name, address, lat, lng, check_in, check_out, place_id
-- `activities` — id, trip_id, day_date, start_time, title, description, location, cover_image_url
-- `itinerary_days` — id, trip_id, day_date, title, summary
-
-RLS: guests read trip-scoped data and write only their own flight/accommodation/profile rows; admins read/write all via `has_role(auth.uid(), 'admin')`.
-
-**Server functions** (`src/lib/*.functions.ts`):
-
-- `acceptInvite`, `getMyProfile`, `updateProfile`
-- `lookupFlight` (calls AeroDataBox via RapidAPI, server-only key)
-- `saveFlight`, `saveAccommodation`
-- `getDashboard` (trip + my flight/stay + group flights + group stays + next-up activities)
-- `getItinerary`, admin: `createInvite`, `listGuests`, `upsertActivity`, `upsertDay`
-
-**Server route**: `src/routes/api/public/accept-invite.ts` for token validation.
-
-## External APIs (real, via secrets)
-
-- **Mapbox** — `VITE_MAPBOX_PUBLIC_TOKEN` (client) for map + Places autocomplete.
-- **AeroDataBox** (RapidAPI) — `RAPIDAPI_KEY` (server-only) for flight lookup. Robust fallback: if lookup fails, guest can enter details manually.
-
-I will request these via the secret tool after Cloud is enabled.
-
-## Mobile-first dashboard composition
-
-Matches the chosen prototype exactly: sticky paper-blur nav → countdown hero card with cover image → Flight Board card → Stay Map card (preview with pins, taps into `/map`) → Itinerary timeline (next 2 days) → fixed bottom pill with avatar stack + "Open WhatsApp".
-
-## Admin
-
-Simple guarded views: invite generator (creates token + copyable link), guest table with flight/stay status, itinerary editor (day → activities CRUD), trip settings (WhatsApp URL, dates, map default).
+- Schema, RLS, roles, has_role, profile auto-creation trigger — already migrated.
+- Routes: `/`, `/login`, `/onboarding`, `/dashboard`, `/itinerary`, `/map`, `/admin/*`.
+- Auth: email magic link + invite token acceptance via `/api/public/accept-invite`.
+- Server functions: `acceptInvite`, `updateProfile`, `geocode` (Nominatim proxy), `saveFlight`, `saveAccommodation`, `getDashboard`, `getItinerary`, admin CRUD.
+- Design tokens (jungle/terracotta/sand/paper), fonts (DM Serif Display + Fira Sans), mobile-first composition exactly matching the chosen prototype.
+- Seed: trip "Warkina 30th Bali" + sample itinerary days/activities.
+- Admin: invite generator, guest table, itinerary editor, trip settings (incl. WhatsApp URL).
 
 ## Build sequence
 
-1. Enable Lovable Cloud; create schema + RLS + `has_role`.
-2. Tokens in `styles.css`, base layout (root, `_authenticated`, `_admin`), nav, fonts.
-3. Auth: magic-link login + invite acceptance flow.
-4. Onboarding wizard (5 steps) with resume.
-5. Server fns + Mapbox & AeroDataBox integrations.
-6. Dashboard, full map page, full itinerary page.
-7. Admin surfaces.
-8. Seed a demo trip + sample activities for preview.
+1. Tokens + base layout (root, `_authenticated`, `_admin`, nav, fonts).
+2. Magic-link login + invite landing + `/api/public/accept-invite`.
+3. Onboarding wizard (with Nominatim lookup in step 4).
+4. Dashboard + full `/map` (Leaflet) + full `/itinerary`.
+5. Admin views.
+6. Seed sample data for the Warkina trip.
 
-## Out of scope (this pass)
+## Out of scope
 
-Push notifications, payments, two-way WhatsApp sync, multi-trip support (single active trip), per-user OAuth into WhatsApp.
+Real-time flight status, push notifications, payments, multi-trip, two-way WhatsApp sync.
