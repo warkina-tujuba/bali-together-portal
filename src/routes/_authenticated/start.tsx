@@ -276,9 +276,9 @@ function StartWizard() {
           >
             <StayStep
               destination={picked?.name ?? null}
-              geoFn={geoFn}
-              parseStay={parseStay}
-              stayFn={stayFn}
+              geoFnProp={geoFn}
+              parseStayProp={parseStay}
+              stayFnProp={stayFn}
               onDone={finish}
             />
           </Step>
@@ -395,12 +395,12 @@ function FlightStep({ tripStart, onDone }: { tripStart: string | null; onDone: (
 }
 
 function StayStep({
-  destination, geoFn, parseStay, stayFn, onDone,
+  destination, geoFnProp, parseStayProp, stayFnProp, onDone,
 }: {
   destination: string | null;
-  geoFn: ReturnType<typeof useServerFn<typeof geocode>>;
-  parseStay: ReturnType<typeof useServerFn<typeof parseStayText>>;
-  stayFn: ReturnType<typeof useServerFn<typeof saveAccommodation>>;
+  geoFnProp: ReturnType<typeof useServerFn<typeof geocode>>;
+  parseStayProp: ReturnType<typeof useServerFn<typeof parseStayText>>;
+  stayFnProp: ReturnType<typeof useServerFn<typeof saveAccommodation>>;
   onDone: () => void;
 }) {
   const [answer, setAnswer] = useState<"yes" | "no" | null>(null);
@@ -420,10 +420,10 @@ function StayStep({
           <TabsTrigger value="search" className="rounded-lg">Search</TabsTrigger>
         </TabsList>
         <TabsContent value="paste" className="mt-4">
-          <StayPasteForm parse={parseStay} geocode={geoFn} onSave={async (s) => { await stayFn({ data: s }); onDone(); }} />
+          <StayPasteForm parse={parseStayProp} geocode={geoFnProp} onSave={async (s) => { await stayFnProp({ data: s }); onDone(); }} />
         </TabsContent>
         <TabsContent value="search" className="mt-4">
-          <StaySearchForm geocode={geoFn} destinationHint={destination} onSave={async (s) => { await stayFn({ data: s }); onDone(); }} />
+          <StaySearchForm geocode={geoFnProp} destinationHint={destination} onSave={async (s) => { await stayFnProp({ data: s }); onDone(); }} />
         </TabsContent>
       </Tabs>
       <button onClick={() => setAnswer(null)} className="mt-3 text-xs text-muted-foreground">← Back to options</button>
