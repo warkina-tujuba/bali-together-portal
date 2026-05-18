@@ -172,7 +172,7 @@ function Dashboard() {
   const myStay = data.stays.find((s: { user_id: string }) => s.user_id === data.userId);
 
   return (
-    <main className="mx-auto w-full max-w-[1500px] px-3 py-4 sm:px-5">
+    <main className="mx-auto w-full max-w-[1500px] overflow-x-hidden px-3 py-4 sm:px-5">
       {/* Hero strip */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
