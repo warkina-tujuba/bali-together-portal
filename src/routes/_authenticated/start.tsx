@@ -4,12 +4,14 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { acceptInvite } from "@/lib/trip.functions";
+import { saveTripPreferences } from "@/lib/recommend.functions";
 import { format, differenceInCalendarDays } from "date-fns";
 import { CalendarIcon, ArrowLeft, ArrowRight, MapPin, Plane, Home, Sparkles, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   createTrip, geocode, updateProfile, saveAccommodation, parseStayText,
 } from "@/lib/trip.functions";
+import { Slider } from "@/components/ui/slider";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,6 +46,7 @@ function StartWizard() {
   const stayFn = useServerFn(saveAccommodation);
   const parseStay = useServerFn(parseStayText);
   const acceptFn = useServerFn(acceptInvite);
+  const savePrefsFn = useServerFn(saveTripPreferences);
 
   // If user arrived with an invite, accept it and skip the wizard
   useEffect(() => {
@@ -57,7 +60,7 @@ function StartWizard() {
     })();
   }, [invite, acceptFn, updateFn, navigate]);
 
-  const TOTAL = 4;
+  const TOTAL = 5;
   const [step, setStep] = useState(0);
 
   // Step 1 - debounced autocomplete
@@ -92,6 +95,8 @@ function StartWizard() {
 
   const [creating, setCreating] = useState(false);
   const [tripId, setTripId] = useState<string | null>(null);
+  const [vibe, setVibe] = useState({ adventure: 50, culture: 50, budget: 50, foodie: 50, pace: 50 });
+  const [saving, setSaving] = useState(false);
 
   const nights = useMemo(
     () => (start && end ? Math.max(0, differenceInCalendarDays(end, start)) : 0),
@@ -133,10 +138,16 @@ function StartWizard() {
   }
 
   async function finish() {
+    setSaving(true);
     try {
+      await savePrefsFn({ data: { vibe } });
       await updateFn({ data: { onboarding_complete: true, onboarding_step: TOTAL } });
-    } catch { /* ignore */ }
-    navigate({ to: "/dashboard" });
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSaving(false);
+    }
+    navigate({ to: "/discover" });
   }
 
   const canNext0 = !!picked;
@@ -161,7 +172,7 @@ function StartWizard() {
         {step === 0 && (
           <Step
             icon={<MapPin className="h-5 w-5" />}
-            eyebrow="Step 1 of 4"
+            eyebrow="Step 1 of 5"
             title="Where are you looking to go?"
             subtitle="Pick a city, country, or neighbourhood."
           >
@@ -205,7 +216,7 @@ function StartWizard() {
         {step === 1 && (
           <Step
             icon={<CalendarIcon className="h-5 w-5" />}
-            eyebrow="Step 2 of 4"
+            eyebrow="Step 2 of 5"
             title="When are you going?"
             subtitle={picked ? `Select your dates in ${picked.name.split(",")[0]}.` : "Pick start and end."}
           >
@@ -231,7 +242,7 @@ function StartWizard() {
         {step === 2 && (
           <Step
             icon={<Plane className="h-5 w-5" />}
-            eyebrow="Step 3 of 4"
+            eyebrow="Step 3 of 5"
             title="Have you booked flights?"
             subtitle="So your crew can see when you land."
           >
@@ -245,7 +256,7 @@ function StartWizard() {
         {step === 3 && (
           <Step
             icon={<Home className="h-5 w-5" />}
-            eyebrow="Step 4 of 4"
+            eyebrow="Step 4 of 5"
             title="Have you booked accommodation?"
             subtitle="We'll drop a 🏠 pin on the group map."
           >
@@ -254,8 +265,25 @@ function StartWizard() {
               geoFnProp={geoFn}
               parseStayProp={parseStay}
               stayFnProp={stayFn}
-              onDone={finish}
+              onDone={() => setStep(4)}
             />
+          </Step>
+        )}
+
+        {step === 4 && (
+          <Step
+            icon={<Sparkles className="h-5 w-5" />}
+            eyebrow="Step 5 of 5"
+            title="Tell us your vibe"
+            subtitle="Slide each scale toward how you want to travel."
+          >
+            <div className="mt-6 space-y-6">
+              <VibeRow label="Relax" right="Adventure" value={vibe.adventure} onChange={(v)=>setVibe({...vibe, adventure: v})}/>
+              <VibeRow label="Party" right="Culture" value={vibe.culture} onChange={(v)=>setVibe({...vibe, culture: v})}/>
+              <VibeRow label="Budget" right="Luxury" value={vibe.budget} onChange={(v)=>setVibe({...vibe, budget: v})}/>
+              <VibeRow label="Light bites" right="Foodie" value={vibe.foodie} onChange={(v)=>setVibe({...vibe, foodie: v})}/>
+              <VibeRow label="Spontaneous" right="Planned" value={vibe.pace} onChange={(v)=>setVibe({...vibe, pace: v})}/>
+            </div>
           </Step>
         )}
       </Card>
@@ -283,12 +311,28 @@ function StartWizard() {
           >
             Next <ArrowRight className="ml-1 h-4 w-4" />
           </Button>
+        ) : step === 4 ? (
+          <Button onClick={finish} disabled={saving} className="h-11 rounded-xl px-6">
+            {saving ? "Saving…" : "See recommendations"} <Sparkles className="ml-1 h-4 w-4" />
+          </Button>
         ) : (
-          <Button variant="ghost" onClick={step === 3 ? finish : () => setStep(step + 1)} className="rounded-xl">
+          <Button variant="ghost" onClick={() => setStep(step + 1)} className="rounded-xl">
             Skip for now <ArrowRight className="ml-1 h-4 w-4" />
           </Button>
         )}
       </div>
+    </div>
+  );
+}
+
+function VibeRow({ label, right, value, onChange }: { label: string; right: string; value: number; onChange: (v: number) => void }) {
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between text-xs font-medium text-muted-foreground">
+        <span>{label}</span>
+        <span>{right}</span>
+      </div>
+      <Slider value={[value]} onValueChange={([v]) => onChange(v)} min={0} max={100} step={1} />
     </div>
   );
 }

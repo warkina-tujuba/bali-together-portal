@@ -16,6 +16,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedStartRouteImport } from './routes/_authenticated/start'
 import { Route as AuthenticatedMapRouteImport } from './routes/_authenticated/map'
 import { Route as AuthenticatedItineraryRouteImport } from './routes/_authenticated/itinerary'
+import { Route as AuthenticatedDiscoverRouteImport } from './routes/_authenticated/discover'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated/chat'
 import { Route as AuthenticatedAgendaRouteImport } from './routes/_authenticated/agenda'
@@ -55,6 +56,11 @@ const AuthenticatedItineraryRoute = AuthenticatedItineraryRouteImport.update({
   path: '/itinerary',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedDiscoverRoute = AuthenticatedDiscoverRouteImport.update({
+  id: '/discover',
+  path: '/discover',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -84,6 +90,7 @@ export interface FileRoutesByFullPath {
   '/agenda': typeof AuthenticatedAgendaRoute
   '/chat': typeof AuthenticatedChatRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/discover': typeof AuthenticatedDiscoverRoute
   '/itinerary': typeof AuthenticatedItineraryRoute
   '/map': typeof AuthenticatedMapRoute
   '/start': typeof AuthenticatedStartRoute
@@ -96,6 +103,7 @@ export interface FileRoutesByTo {
   '/agenda': typeof AuthenticatedAgendaRoute
   '/chat': typeof AuthenticatedChatRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/discover': typeof AuthenticatedDiscoverRoute
   '/itinerary': typeof AuthenticatedItineraryRoute
   '/map': typeof AuthenticatedMapRoute
   '/start': typeof AuthenticatedStartRoute
@@ -110,6 +118,7 @@ export interface FileRoutesById {
   '/_authenticated/agenda': typeof AuthenticatedAgendaRoute
   '/_authenticated/chat': typeof AuthenticatedChatRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/discover': typeof AuthenticatedDiscoverRoute
   '/_authenticated/itinerary': typeof AuthenticatedItineraryRoute
   '/_authenticated/map': typeof AuthenticatedMapRoute
   '/_authenticated/start': typeof AuthenticatedStartRoute
@@ -124,6 +133,7 @@ export interface FileRouteTypes {
     | '/agenda'
     | '/chat'
     | '/dashboard'
+    | '/discover'
     | '/itinerary'
     | '/map'
     | '/start'
@@ -136,6 +146,7 @@ export interface FileRouteTypes {
     | '/agenda'
     | '/chat'
     | '/dashboard'
+    | '/discover'
     | '/itinerary'
     | '/map'
     | '/start'
@@ -149,6 +160,7 @@ export interface FileRouteTypes {
     | '/_authenticated/agenda'
     | '/_authenticated/chat'
     | '/_authenticated/dashboard'
+    | '/_authenticated/discover'
     | '/_authenticated/itinerary'
     | '/_authenticated/map'
     | '/_authenticated/start'
@@ -212,6 +224,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedItineraryRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/discover': {
+      id: '/_authenticated/discover'
+      path: '/discover'
+      fullPath: '/discover'
+      preLoaderRoute: typeof AuthenticatedDiscoverRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -248,6 +267,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedAgendaRoute: typeof AuthenticatedAgendaRoute
   AuthenticatedChatRoute: typeof AuthenticatedChatRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedDiscoverRoute: typeof AuthenticatedDiscoverRoute
   AuthenticatedItineraryRoute: typeof AuthenticatedItineraryRoute
   AuthenticatedMapRoute: typeof AuthenticatedMapRoute
   AuthenticatedStartRoute: typeof AuthenticatedStartRoute
@@ -258,6 +278,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAgendaRoute: AuthenticatedAgendaRoute,
   AuthenticatedChatRoute: AuthenticatedChatRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedDiscoverRoute: AuthenticatedDiscoverRoute,
   AuthenticatedItineraryRoute: AuthenticatedItineraryRoute,
   AuthenticatedMapRoute: AuthenticatedMapRoute,
   AuthenticatedStartRoute: AuthenticatedStartRoute,
