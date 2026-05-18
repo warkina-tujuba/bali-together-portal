@@ -90,10 +90,6 @@ function StartWizard() {
   const [end, setEnd] = useState<Date | undefined>();
   const range: DateRange | undefined = start ? { from: start, to: end } : undefined;
 
-  // Step 3
-  const [occasion, setOccasion] = useState("just-because");
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
   const [creating, setCreating] = useState(false);
   const [tripId, setTripId] = useState<string | null>(null);
 
