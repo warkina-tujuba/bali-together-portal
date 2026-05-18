@@ -21,8 +21,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { OccasionPicker } from "@/components/trip/OccasionPicker";
 import { FlightSmartForm } from "@/components/trip/FlightSmartForm";
 import { StayPasteForm } from "@/components/trip/StayPasteForm";
-import { StaySearchForm } from "@/components/trip/StaySearchForm";
+import { StayAddressForm } from "@/components/trip/StayAddressForm";
 import { toast } from "sonner";
+import type { DateRange } from "react-day-picker";
 
 const searchSchema = z.object({ invite: z.string().optional() });
 
