@@ -172,7 +172,7 @@ function Dashboard() {
   const myStay = data.stays.find((s: { user_id: string }) => s.user_id === data.userId);
 
   return (
-    <main className="mx-auto w-full max-w-[1500px] px-3 py-4 sm:px-5">
+    <main className="mx-auto w-full max-w-[1500px] overflow-x-hidden px-3 py-4 sm:px-5">
       {/* Hero strip */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -243,9 +243,9 @@ function Dashboard() {
       </div>
 
       {/* Split: list left / map right */}
-      <div className="grid gap-4 lg:grid-cols-[1fr_520px]">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_520px]">
         {/* LEFT: day plan + recommendations */}
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           <Card className="rounded-3xl border-0 p-4 shadow-soft sm:p-5">
             <div className="flex items-center justify-between">
               <h2 className="font-display text-2xl">

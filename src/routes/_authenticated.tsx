@@ -33,7 +33,7 @@ function AuthShell() {
   const hideNav = location.pathname.startsWith("/start");
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen w-full overflow-x-hidden bg-background pb-24">
       {!hideNav && <TopNav />}
       <Outlet />
       {!hideNav && <BottomBar />}
