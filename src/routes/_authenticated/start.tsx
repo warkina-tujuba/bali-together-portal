@@ -24,13 +24,37 @@ import { StayPasteForm } from "@/components/trip/StayPasteForm";
 import { StaySearchForm } from "@/components/trip/StaySearchForm";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/_authenticated/start")({ component: StartWizard });
+const searchSchema = z.object({ invite: z.string().optional() });
+
+export const Route = createFileRoute("/_authenticated/start")({
+  validateSearch: searchSchema,
+  component: StartWizard,
+});
 
 type GeoHit = { name: string; lat: number; lng: number };
 
 function StartWizard() {
+  const { invite } = useSearch({ from: "/_authenticated/start" });
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const geoFn = useServerFn(geocode);
+  const createTripFn = useServerFn(createTrip);
+  const updateFn = useServerFn(updateProfile);
+  const stayFn = useServerFn(saveAccommodation);
+  const parseStay = useServerFn(parseStayText);
+  const acceptFn = useServerFn(acceptInvite);
+
+  // If user arrived with an invite, accept it and skip the wizard
+  useEffect(() => {
+    if (!invite) return;
+    (async () => {
+      try {
+        await acceptFn({ data: { token: invite } });
+        await updateFn({ data: { onboarding_complete: true } });
+      } catch { /* ignore */ }
+      navigate({ to: "/dashboard" });
+    })();
+  }, [invite, acceptFn, updateFn, navigate]);
   const geoFn = useServerFn(geocode);
   const createTripFn = useServerFn(createTrip);
   const updateFn = useServerFn(updateProfile);
