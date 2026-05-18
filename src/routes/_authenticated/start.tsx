@@ -175,22 +175,17 @@ function StartWizard() {
               <div className="relative">
                 <Input
                   value={destQuery}
-                  onChange={(e) => { setDestQuery(e.target.value); setPicked(null); }}
-                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); search(); } }}
-                  placeholder="e.g. Canggu, Bali"
-                  className="h-14 rounded-xl pr-24 text-base"
+                  onChange={(e) => { setDestQuery(e.target.value); setPicked(null); setShowHits(true); }}
+                  onFocus={() => setShowHits(true)}
+                  placeholder="Start typing… e.g. Canggu, Bali"
+                  className="h-14 rounded-xl pr-12 text-base"
                   autoFocus
                 />
-                <Button
-                  size="sm"
-                  onClick={search}
-                  disabled={searching || !destQuery.trim()}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg"
-                >
-                  {searching ? "…" : "Search"}
-                </Button>
+                {searching && (
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">…</div>
+                )}
               </div>
-              {hits.length > 0 && (
+              {showHits && hits.length > 0 && !picked && (
                 <div className="overflow-hidden rounded-xl border">
                   {hits.map((h, i) => (
                     <button
@@ -217,16 +212,23 @@ function StartWizard() {
           <Step
             icon={<CalendarIcon className="h-5 w-5" />}
             eyebrow="Step 2 of 5"
-            title="What are your dates?"
-            subtitle={picked ? `When in ${picked.name}?` : "Pick start and end."}
+            title="When are you going?"
+            subtitle={picked ? `Select your dates in ${picked.name.split(",")[0]}.` : "Pick start and end."}
           >
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <DateField label="Start" value={start} onChange={setStart} />
-              <DateField label="End" value={end} onChange={setEnd} minDate={start} />
+            <div className="mt-5 flex justify-center rounded-2xl border bg-secondary/30 p-2">
+              <Calendar
+                mode="range"
+                numberOfMonths={2}
+                selected={range}
+                onSelect={(r) => { setStart(r?.from); setEnd(r?.to); }}
+                disabled={(d) => d < new Date(new Date().setHours(0,0,0,0))}
+                initialFocus
+                className={cn("pointer-events-auto")}
+              />
             </div>
             {start && end && (
-              <p className="mt-4 text-sm text-muted-foreground">
-                {nights} {nights === 1 ? "night" : "nights"} in {picked?.name ?? "destination"}.
+              <p className="mt-4 text-center text-sm text-muted-foreground">
+                <strong className="text-foreground">{format(start, "MMM d")}</strong> → <strong className="text-foreground">{format(end, "MMM d, yyyy")}</strong> · {nights} {nights === 1 ? "night" : "nights"}
               </p>
             )}
           </Step>
