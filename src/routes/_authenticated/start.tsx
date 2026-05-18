@@ -1,0 +1,428 @@
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useState, useMemo } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { useQueryClient } from "@tanstack/react-query";
+import { format, differenceInCalendarDays } from "date-fns";
+import { CalendarIcon, ArrowLeft, ArrowRight, MapPin, Plane, Home, Sparkles, Check } from "lucide-react";
+import { cn } from "@/lib/utils";
+import {
+  createTrip, geocode, updateProfile, saveAccommodation, parseStayText,
+} from "@/lib/trip.functions";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { OccasionPicker } from "@/components/trip/OccasionPicker";
+import { FlightSmartForm } from "@/components/trip/FlightSmartForm";
+import { StayPasteForm } from "@/components/trip/StayPasteForm";
+import { StaySearchForm } from "@/components/trip/StaySearchForm";
+import { toast } from "sonner";
+
+export const Route = createFileRoute("/_authenticated/start")({ component: StartWizard });
+
+type GeoHit = { name: string; lat: number; lng: number };
+
+function StartWizard() {
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  const geoFn = useServerFn(geocode);
+  const createTripFn = useServerFn(createTrip);
+  const updateFn = useServerFn(updateProfile);
+  const stayFn = useServerFn(saveAccommodation);
+  const parseStay = useServerFn(parseStayText);
+
+  const TOTAL = 5;
+  const [step, setStep] = useState(0);
+
+  // Step 1
+  const [destQuery, setDestQuery] = useState("");
+  const [hits, setHits] = useState<GeoHit[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [picked, setPicked] = useState<GeoHit | null>(null);
+
+  // Step 2
+  const [start, setStart] = useState<Date | undefined>();
+  const [end, setEnd] = useState<Date | undefined>();
+
+  // Step 3
+  const [occasion, setOccasion] = useState("just-because");
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [tripId, setTripId] = useState<string | null>(null);
+
+  const nights = useMemo(
+    () => (start && end ? Math.max(0, differenceInCalendarDays(end, start)) : 0),
+    [start, end],
+  );
+
+  async function search() {
+    if (!destQuery.trim()) return;
+    setSearching(true);
+    try {
+      const r = await geoFn({ data: { q: destQuery } });
+      setHits((r.results ?? []).slice(0, 6).map((h: { name: string; lat: number; lng: number }) => ({
+        name: h.name, lat: h.lat, lng: h.lng,
+      })));
+    } catch { /* ignore */ }
+    finally { setSearching(false); }
+  }
+
+  function pick(h: GeoHit) {
+    setPicked(h);
+    setDestQuery(h.name);
+    setHits([]);
+  }
+
+  async function handleCreate() {
+    if (!picked || !start || !end || !name.trim()) {
+      toast.error("Add a name to continue");
+      return;
+    }
+    setCreating(true);
+    try {
+      const r = await createTripFn({
+        data: {
+          name: name.trim(),
+          occasion,
+          destination: picked.name,
+          lat: picked.lat,
+          lng: picked.lng,
+          start_date: format(start, "yyyy-MM-dd"),
+          end_date: format(end, "yyyy-MM-dd"),
+          description: description.trim() || null,
+        },
+      });
+      setTripId(r.trip.id);
+      await qc.invalidateQueries();
+      setStep(3);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't create trip");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function finish() {
+    try {
+      await updateFn({ data: { onboarding_complete: true, onboarding_step: TOTAL } });
+    } catch { /* ignore */ }
+    navigate({ to: "/dashboard" });
+  }
+
+  const canNext0 = !!picked;
+  const canNext1 = !!start && !!end && (start <= end);
+
+  return (
+    <div className="mx-auto flex min-h-[calc(100vh-3.5rem)] max-w-2xl flex-col px-5 py-6">
+      {/* Progress dots */}
+      <div className="mb-6 flex items-center justify-center gap-2">
+        {Array.from({ length: TOTAL }).map((_, i) => (
+          <div
+            key={i}
+            className={cn(
+              "h-1.5 rounded-full transition-all",
+              i === step ? "w-8 bg-primary" : i < step ? "w-4 bg-primary/60" : "w-4 bg-border",
+            )}
+          />
+        ))}
+      </div>
+
+      <Card className="flex-1 rounded-3xl border-0 p-7 shadow-card animate-in fade-in duration-300" key={step}>
+        {step === 0 && (
+          <Step
+            icon={<MapPin className="h-5 w-5" />}
+            eyebrow="Step 1 of 5"
+            title="Where are you looking to go?"
+            subtitle="Pick a city, country, or neighbourhood."
+          >
+            <div className="mt-5 space-y-3">
+              <div className="relative">
+                <Input
+                  value={destQuery}
+                  onChange={(e) => { setDestQuery(e.target.value); setPicked(null); }}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); search(); } }}
+                  placeholder="e.g. Canggu, Bali"
+                  className="h-14 rounded-xl pr-24 text-base"
+                  autoFocus
+                />
+                <Button
+                  size="sm"
+                  onClick={search}
+                  disabled={searching || !destQuery.trim()}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg"
+                >
+                  {searching ? "…" : "Search"}
+                </Button>
+              </div>
+              {hits.length > 0 && (
+                <div className="overflow-hidden rounded-xl border">
+                  {hits.map((h, i) => (
+                    <button
+                      key={i}
+                      onClick={() => pick(h)}
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm hover:bg-secondary"
+                    >
+                      <MapPin className="h-4 w-4 text-muted-foreground" />
+                      <span>{h.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {picked && (
+                <div className="flex items-center gap-2 rounded-xl bg-secondary px-4 py-3 text-sm">
+                  <Check className="h-4 w-4 text-primary" /> Heading to <strong>{picked.name}</strong>
+                </div>
+              )}
+            </div>
+          </Step>
+        )}
+
+        {step === 1 && (
+          <Step
+            icon={<CalendarIcon className="h-5 w-5" />}
+            eyebrow="Step 2 of 5"
+            title="What are your dates?"
+            subtitle={picked ? `When in ${picked.name}?` : "Pick start and end."}
+          >
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <DateField label="Start" value={start} onChange={setStart} />
+              <DateField label="End" value={end} onChange={setEnd} minDate={start} />
+            </div>
+            {start && end && (
+              <p className="mt-4 text-sm text-muted-foreground">
+                {nights} {nights === 1 ? "night" : "nights"} in {picked?.name ?? "destination"}.
+              </p>
+            )}
+          </Step>
+        )}
+
+        {step === 2 && (
+          <Step
+            icon={<Sparkles className="h-5 w-5" />}
+            eyebrow="Step 3 of 5"
+            title="What's the occasion?"
+            subtitle="Give your trip a name your crew will recognise."
+          >
+            <div className="mt-5 space-y-5">
+              <Field label="Occasion">
+                <OccasionPicker value={occasion} onChange={setOccasion} />
+              </Field>
+              <Field label="Trip name">
+                <Input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder={`${capitalise(occasion)} in ${picked?.name?.split(",")[0] ?? "Bali"}`}
+                  className="h-12 rounded-xl"
+                />
+              </Field>
+              <Field label="Description (optional)">
+                <Textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="A weekend of beach mornings, scooter days, and one fancy dinner."
+                  className="min-h-[80px] rounded-xl"
+                />
+              </Field>
+            </div>
+          </Step>
+        )}
+
+        {step === 3 && (
+          <Step
+            icon={<Plane className="h-5 w-5" />}
+            eyebrow="Step 4 of 5"
+            title="Have you booked flights?"
+            subtitle="So your crew can see when you land."
+          >
+            <FlightStep
+              tripStart={start ? format(start, "yyyy-MM-dd") : null}
+              onDone={() => setStep(4)}
+            />
+          </Step>
+        )}
+
+        {step === 4 && (
+          <Step
+            icon={<Home className="h-5 w-5" />}
+            eyebrow="Step 5 of 5"
+            title="Have you booked accommodation?"
+            subtitle="We'll drop a 🏠 pin on the group map."
+          >
+            <StayStep
+              destination={picked?.name ?? null}
+              geoFn={geoFn}
+              parseStay={parseStay}
+              stayFn={stayFn}
+              onDone={finish}
+            />
+          </Step>
+        )}
+      </Card>
+
+      {/* Footer */}
+      <div className="mt-5 flex items-center justify-between gap-3">
+        <Button
+          variant="ghost"
+          onClick={() => setStep(Math.max(0, step - 1))}
+          disabled={step === 0}
+          className="rounded-xl"
+        >
+          <ArrowLeft className="mr-1 h-4 w-4" /> Back
+        </Button>
+
+        {step === 2 ? (
+          <Button onClick={handleCreate} disabled={creating || !name.trim() || !picked || !start || !end} className="h-11 rounded-xl px-6">
+            {creating ? "Creating…" : "Create trip"} <ArrowRight className="ml-1 h-4 w-4" />
+          </Button>
+        ) : step < 3 ? (
+          <Button
+            onClick={() => setStep(step + 1)}
+            disabled={(step === 0 && !canNext0) || (step === 1 && !canNext1)}
+            className="h-11 rounded-xl px-6"
+          >
+            Next <ArrowRight className="ml-1 h-4 w-4" />
+          </Button>
+        ) : (
+          <Button variant="ghost" onClick={step === 4 ? finish : () => setStep(step + 1)} className="rounded-xl">
+            Skip for now <ArrowRight className="ml-1 h-4 w-4" />
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Step({
+  icon, eyebrow, title, subtitle, children,
+}: { icon: React.ReactNode; eyebrow: string; title: string; subtitle?: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-muted-foreground">
+        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary">{icon}</span>
+        {eyebrow}
+      </div>
+      <h1 className="mt-3 font-display text-3xl sm:text-4xl leading-tight">{title}</h1>
+      {subtitle && <p className="mt-2 text-sm text-muted-foreground">{subtitle}</p>}
+      {children}
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <Label className="text-xs uppercase tracking-wider text-muted-foreground">{label}</Label>
+      <div className="mt-1.5">{children}</div>
+    </div>
+  );
+}
+
+function DateField({
+  label, value, onChange, minDate,
+}: { label: string; value?: Date; onChange: (d?: Date) => void; minDate?: Date }) {
+  return (
+    <Field label={label}>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            className={cn(
+              "h-12 w-full justify-start rounded-xl text-left font-normal",
+              !value && "text-muted-foreground",
+            )}
+          >
+            <CalendarIcon className="mr-2 h-4 w-4" />
+            {value ? format(value, "PPP") : "Pick a date"}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <Calendar
+            mode="single"
+            selected={value}
+            onSelect={onChange}
+            disabled={(d) => (minDate ? d < minDate : false)}
+            initialFocus
+            className={cn("p-3 pointer-events-auto")}
+          />
+        </PopoverContent>
+      </Popover>
+    </Field>
+  );
+}
+
+function FlightStep({ tripStart, onDone }: { tripStart: string | null; onDone: () => void }) {
+  const [answer, setAnswer] = useState<"yes" | "no" | null>(null);
+  if (answer === null) {
+    return (
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <ChoiceCard label="Yes, I've booked" hint="Add your flight" onClick={() => setAnswer("yes")} />
+        <ChoiceCard label="Not yet" hint="Skip for now" onClick={onDone} />
+      </div>
+    );
+  }
+  return (
+    <div className="mt-5">
+      <FlightSmartForm defaultDate={tripStart} onSaved={onDone} ctaLabel="Save & continue" />
+      <button onClick={() => setAnswer(null)} className="mt-3 text-xs text-muted-foreground">← Back to options</button>
+    </div>
+  );
+}
+
+function StayStep({
+  destination, geoFn, parseStay, stayFn, onDone,
+}: {
+  destination: string | null;
+  geoFn: ReturnType<typeof useServerFn<typeof geocode>>;
+  parseStay: ReturnType<typeof useServerFn<typeof parseStayText>>;
+  stayFn: ReturnType<typeof useServerFn<typeof saveAccommodation>>;
+  onDone: () => void;
+}) {
+  const [answer, setAnswer] = useState<"yes" | "no" | null>(null);
+  if (answer === null) {
+    return (
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <ChoiceCard label="Yes, I've booked" hint="Add your stay" onClick={() => setAnswer("yes")} />
+        <ChoiceCard label="Not yet" hint="Skip for now" onClick={onDone} />
+      </div>
+    );
+  }
+  return (
+    <div className="mt-5">
+      <Tabs defaultValue="paste">
+        <TabsList className="grid w-full grid-cols-2 rounded-xl">
+          <TabsTrigger value="paste" className="rounded-lg">Paste booking</TabsTrigger>
+          <TabsTrigger value="search" className="rounded-lg">Search</TabsTrigger>
+        </TabsList>
+        <TabsContent value="paste" className="mt-4">
+          <StayPasteForm parse={parseStay} geocode={geoFn} onSave={async (s) => { await stayFn({ data: s }); onDone(); }} />
+        </TabsContent>
+        <TabsContent value="search" className="mt-4">
+          <StaySearchForm geocode={geoFn} destinationHint={destination} onSave={async (s) => { await stayFn({ data: s }); onDone(); }} />
+        </TabsContent>
+      </Tabs>
+      <button onClick={() => setAnswer(null)} className="mt-3 text-xs text-muted-foreground">← Back to options</button>
+    </div>
+  );
+}
+
+function ChoiceCard({ label, hint, onClick }: { label: string; hint: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="group rounded-2xl border-2 border-border p-5 text-left transition hover:border-primary hover:bg-primary/5"
+    >
+      <p className="font-display text-xl">{label}</p>
+      <p className="mt-1 text-sm text-muted-foreground">{hint}</p>
+    </button>
+  );
+}
+
+function capitalise(s: string) {
+  if (!s) return "";
+  return s.charAt(0).toUpperCase() + s.slice(1).replace(/-/g, " ");
+}
