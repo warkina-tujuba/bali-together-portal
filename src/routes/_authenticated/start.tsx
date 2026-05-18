@@ -55,11 +55,6 @@ function StartWizard() {
       navigate({ to: "/dashboard" });
     })();
   }, [invite, acceptFn, updateFn, navigate]);
-  const geoFn = useServerFn(geocode);
-  const createTripFn = useServerFn(createTrip);
-  const updateFn = useServerFn(updateProfile);
-  const stayFn = useServerFn(saveAccommodation);
-  const parseStay = useServerFn(parseStayText);
 
   const TOTAL = 5;
   const [step, setStep] = useState(0);
