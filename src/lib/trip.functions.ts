@@ -922,113 +922,99 @@ export const addCatalogueToTrip = createServerFn({ method: "POST" })
 // ============================================================
 // Crew: join by code + host approval
 // ============================================================
+type TripSummary = {
+  id: string; name: string; destination: string;
+  start_date: string; end_date: string;
+  cover_image_url: string | null; occasion: string | null;
+};
+type JoinRequestRow = {
+  id: string; trip_id: string; user_id: string; status: string;
+  message: string | null; created_at: string; decided_at: string | null; decided_by: string | null;
+};
+type Requester = { id: string; full_name: string | null; avatar_url: string | null; email: string | null };
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const adminAny = supabaseAdmin as any;
+
 export const getTripByCode = createServerFn({ method: "POST" })
   .inputValidator(z.object({ code: z.string().min(4).max(40) }))
-  .handler(async ({ data }) => {
-    const { data: trip } = await (supabaseAdmin as unknown as { from: (t: string) => { select: (s: string) => { eq: (k: string, v: string) => { maybeSingle: () => Promise<{ data: Record<string, unknown> | null }> } } } })
+  .handler(async ({ data }): Promise<{ trip: TripSummary | null }> => {
+    const { data: trip } = await adminAny
       .from("trips")
       .select("id, name, destination, start_date, end_date, cover_image_url, occasion")
       .eq("join_code", data.code.toLowerCase().trim())
       .maybeSingle();
-    return { trip: trip ?? null };
+    return { trip: (trip as TripSummary | null) ?? null };
   });
 
 export const requestJoinTrip = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(z.object({ code: z.string().min(4).max(40), message: z.string().max(400).optional().nullable() }))
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data, context }): Promise<{ ok: true; status: "already_member" | "pending"; tripId: string }> => {
     const { userId } = context;
-    const admin = supabaseAdmin as unknown as {
-      from: (t: string) => {
-        select: (s: string) => { eq: (k: string, v: string) => { maybeSingle: () => Promise<{ data: Record<string, unknown> | null }> } };
-        upsert: (row: Record<string, unknown>, opts?: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
-        insert: (row: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
-      };
-    };
-    const { data: trip } = await admin.from("trips").select("id, name").eq("join_code", data.code.toLowerCase().trim()).maybeSingle();
+    const { data: trip } = await adminAny.from("trips").select("id, name").eq("join_code", data.code.toLowerCase().trim()).maybeSingle();
     if (!trip) throw new Error("Invalid invite code");
-    // already a member?
-    const { data: profile } = await admin.from("profiles").select("trip_id").eq("id", userId).maybeSingle();
-    if (profile?.trip_id === trip.id) return { ok: true, status: "already_member" as const, tripId: trip.id };
-    // create or refresh request
-    const { error } = await admin.from("trip_join_requests").upsert(
-      { trip_id: trip.id, user_id: userId, status: "pending", message: data.message ?? null },
+    const tripId = String((trip as { id: string }).id);
+    const tripName = String((trip as { name: string }).name);
+    const { data: profile } = await adminAny.from("profiles").select("trip_id").eq("id", userId).maybeSingle();
+    if (profile?.trip_id === tripId) return { ok: true, status: "already_member", tripId };
+    const { error } = await adminAny.from("trip_join_requests").upsert(
+      { trip_id: tripId, user_id: userId, status: "pending", message: data.message ?? null },
       { onConflict: "trip_id,user_id" },
     );
     if (error) throw new Error(error.message);
-    // notify trip admins
-    const { data: adminRows } = await (admin as unknown as { from: (t: string) => { select: (s: string) => { eq: (k: string, v: string) => Promise<{ data: Array<{ user_id: string }> | null }> } } })
-      .from("user_roles").select("user_id").eq("role", "admin");
-    for (const row of adminRows ?? []) {
-      await admin.from("notifications").insert({
-        user_id: row.user_id, trip_id: trip.id, kind: "join_request",
-        payload: { trip_name: trip.name, requester_id: userId },
+    const { data: adminRows } = await adminAny.from("user_roles").select("user_id").eq("role", "admin");
+    for (const row of (adminRows ?? []) as Array<{ user_id: string }>) {
+      await adminAny.from("notifications").insert({
+        user_id: row.user_id, trip_id: tripId, kind: "join_request",
+        payload: { trip_name: tripName, requester_id: userId },
       });
     }
-    return { ok: true, status: "pending" as const, tripId: trip.id };
+    return { ok: true, status: "pending", tripId };
   });
 
 export const listJoinRequests = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .handler(async ({ context }): Promise<{ requests: Array<JoinRequestRow & { requester: Requester | null }> }> => {
     const { userId } = context;
-    const admin = supabaseAdmin as unknown as {
-      from: (t: string) => {
-        select: (s: string) => {
-          eq: (k: string, v: string) => {
-            maybeSingle: () => Promise<{ data: Record<string, unknown> | null }>;
-            order: (c: string, opts?: Record<string, unknown>) => Promise<{ data: Array<Record<string, unknown>> | null }>;
-            in?: (k: string, v: string[]) => Promise<{ data: Array<Record<string, unknown>> | null }>;
-          };
-          in?: (k: string, v: string[]) => Promise<{ data: Array<Record<string, unknown>> | null }>;
-        };
-      };
-    };
-    const { data: role } = await admin.from("user_roles").select("role").eq("user_id", userId).maybeSingle();
-    if (!role) return { requests: [] as Array<Record<string, unknown>> };
-    const { data: profile } = await admin.from("profiles").select("trip_id").eq("id", userId).maybeSingle();
+    const { data: role } = await adminAny.from("user_roles").select("role").eq("user_id", userId).maybeSingle();
+    if (!role) return { requests: [] };
+    const { data: profile } = await adminAny.from("profiles").select("trip_id").eq("id", userId).maybeSingle();
     if (!profile?.trip_id) return { requests: [] };
-    const { data: reqs } = await admin.from("trip_join_requests").select("*").eq("trip_id", profile.trip_id as string).order("created_at", { ascending: false });
-    const ids = (reqs ?? []).map((r) => r.user_id as string);
-    let profiles: Array<{ id: string; full_name: string | null; avatar_url: string | null; email: string | null }> = [];
+    const { data: reqs } = await adminAny
+      .from("trip_join_requests").select("*").eq("trip_id", profile.trip_id).order("created_at", { ascending: false });
+    const rows = (reqs ?? []) as JoinRequestRow[];
+    const ids = rows.map((r) => r.user_id);
+    let profiles: Requester[] = [];
     if (ids.length > 0) {
-      const res = await (admin as unknown as { from: (t: string) => { select: (s: string) => { in: (k: string, v: string[]) => Promise<{ data: typeof profiles | null }> } } })
-        .from("profiles").select("id, full_name, avatar_url, email").in("id", ids);
-      profiles = res.data ?? [];
+      const res = await adminAny.from("profiles").select("id, full_name, avatar_url, email").in("id", ids);
+      profiles = (res.data ?? []) as Requester[];
     }
     const byId = new Map(profiles.map((p) => [p.id, p]));
-    return { requests: (reqs ?? []).map((r) => ({ ...r, requester: byId.get(r.user_id as string) ?? null })) };
+    return { requests: rows.map((r) => ({ ...r, requester: byId.get(r.user_id) ?? null })) };
   });
 
 export const decideJoinRequest = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(z.object({ request_id: z.string().uuid(), approve: z.boolean() }))
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data, context }): Promise<{ ok: true }> => {
     const { userId } = context;
-    const admin = supabaseAdmin as unknown as {
-      from: (t: string) => {
-        select: (s: string) => { eq: (k: string, v: string) => { maybeSingle: () => Promise<{ data: Record<string, unknown> | null }> } };
-        update: (row: Record<string, unknown>) => { eq: (k: string, v: string) => Promise<{ error: { message: string } | null }> };
-        insert: (row: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
-      };
-    };
-    const { data: role } = await admin.from("user_roles").select("role").eq("user_id", userId).maybeSingle();
+    const { data: role } = await adminAny.from("user_roles").select("role").eq("user_id", userId).maybeSingle();
     if (!role) throw new Error("Host only");
-    const { data: req } = await admin.from("trip_join_requests").select("*").eq("id", data.request_id).maybeSingle();
+    const { data: req } = await adminAny.from("trip_join_requests").select("*").eq("id", data.request_id).maybeSingle();
     if (!req) throw new Error("Request not found");
+    const r = req as JoinRequestRow;
     const newStatus = data.approve ? "approved" : "rejected";
-    await admin.from("trip_join_requests").update({ status: newStatus, decided_at: new Date().toISOString(), decided_by: userId }).eq("id", data.request_id);
+    await adminAny.from("trip_join_requests").update({ status: newStatus, decided_at: new Date().toISOString(), decided_by: userId }).eq("id", data.request_id);
     if (data.approve) {
-      await admin.from("profiles").update({ trip_id: req.trip_id }).eq("id", req.user_id as string);
-      // auto-RSVP host events
-      const { data: hostEvents } = await (admin as unknown as { from: (t: string) => { select: (s: string) => { eq: (k: string, v: string) => { eq: (k2: string, v2: boolean) => Promise<{ data: Array<{ id: string }> | null }> } } } })
-        .from("activities").select("id").eq("trip_id", req.trip_id as string).eq("is_host_event", true);
-      for (const ev of hostEvents ?? []) {
-        await admin.from("event_rsvps").insert({ activity_id: ev.id, user_id: req.user_id as string, trip_id: req.trip_id as string, status: "going" });
+      await adminAny.from("profiles").update({ trip_id: r.trip_id }).eq("id", r.user_id);
+      const { data: hostEvents } = await adminAny.from("activities").select("id").eq("trip_id", r.trip_id).eq("is_host_event", true);
+      for (const ev of (hostEvents ?? []) as Array<{ id: string }>) {
+        await adminAny.from("event_rsvps").insert({ activity_id: ev.id, user_id: r.user_id, trip_id: r.trip_id, status: "going" });
       }
     }
-    await admin.from("notifications").insert({
-      user_id: req.user_id as string, trip_id: req.trip_id as string,
+    await adminAny.from("notifications").insert({
+      user_id: r.user_id, trip_id: r.trip_id,
       kind: data.approve ? "join_approved" : "join_rejected", payload: {},
     });
     return { ok: true };
@@ -1036,23 +1022,20 @@ export const decideJoinRequest = createServerFn({ method: "POST" })
 
 export const getMyJoinRequest = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const admin = supabaseAdmin as unknown as {
-      from: (t: string) => { select: (s: string) => { eq: (k: string, v: string) => { order: (c: string, o: Record<string, unknown>) => { limit: (n: number) => { maybeSingle: () => Promise<{ data: Record<string, unknown> | null }> } } } } };
-    };
-    const { data } = await admin.from("trip_join_requests").select("*").eq("user_id", context.userId).order("created_at", { ascending: false }).limit(1).maybeSingle();
-    return { request: data ?? null };
+  .handler(async ({ context }): Promise<{ request: JoinRequestRow | null }> => {
+    const { data } = await adminAny.from("trip_join_requests").select("*").eq("user_id", context.userId).order("created_at", { ascending: false }).limit(1).maybeSingle();
+    return { request: (data as JoinRequestRow | null) ?? null };
   });
 
 export const getMyTripJoinCode = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .handler(async ({ context }): Promise<{ code: string | null }> => {
     const { supabase, userId } = context;
     const { data: profile } = await supabase.from("profiles").select("trip_id").eq("id", userId).maybeSingle();
     if (!profile?.trip_id) return { code: null };
-    const { data: trip } = await (supabase as unknown as { from: (t: string) => { select: (s: string) => { eq: (k: string, v: string) => { maybeSingle: () => Promise<{ data: { join_code: string | null } | null }> } } } })
-      .from("trips").select("join_code").eq("id", profile.trip_id).maybeSingle();
-    return { code: trip?.join_code ?? null };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: trip } = await (supabase as any).from("trips").select("join_code").eq("id", profile.trip_id).maybeSingle();
+    return { code: (trip?.join_code as string | null) ?? null };
   });
 
 // ============================================================
