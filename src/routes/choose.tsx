@@ -57,7 +57,7 @@ function ChoosePage() {
                 e.preventDefault();
                 const t = extractToken(token);
                 if (!t) return;
-                navigate({ to: "/onboarding", search: { invite: t } });
+                navigate({ to: "/start", search: { invite: t } });
               }}
             >
               <Input value={token} onChange={(e) => setToken(e.target.value)} placeholder="Paste link or code…" className="h-11 rounded-xl" />
