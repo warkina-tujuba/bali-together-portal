@@ -150,7 +150,7 @@ export const recordSwipe = createServerFn({ method: "POST" })
       trip_id: profile.trip_id,
       user_id: userId,
       suggestion_key: data.suggestion.key,
-      payload: data.suggestion as unknown as Record<string, unknown>,
+      payload: JSON.parse(JSON.stringify(data.suggestion)),
       verdict: data.verdict,
     }, { onConflict: "user_id,suggestion_key" });
     if (error) throw new Error(error.message);
