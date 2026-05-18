@@ -172,7 +172,7 @@ function StartWizard() {
         {step === 0 && (
           <Step
             icon={<MapPin className="h-5 w-5" />}
-            eyebrow="Step 1 of 4"
+            eyebrow="Step 1 of 5"
             title="Where are you looking to go?"
             subtitle="Pick a city, country, or neighbourhood."
           >
@@ -216,7 +216,7 @@ function StartWizard() {
         {step === 1 && (
           <Step
             icon={<CalendarIcon className="h-5 w-5" />}
-            eyebrow="Step 2 of 4"
+            eyebrow="Step 2 of 5"
             title="When are you going?"
             subtitle={picked ? `Select your dates in ${picked.name.split(",")[0]}.` : "Pick start and end."}
           >
