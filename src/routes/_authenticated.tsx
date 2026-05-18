@@ -30,7 +30,7 @@ function AuthShell() {
 
   if (!ready) return <div className="flex min-h-screen items-center justify-center text-muted-foreground">Loading…</div>;
 
-  const hideNav = location.pathname.startsWith("/onboarding");
+  const hideNav = location.pathname.startsWith("/start");
 
   return (
     <div className="min-h-screen bg-background pb-24">
