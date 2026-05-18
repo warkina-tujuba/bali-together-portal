@@ -918,3 +918,298 @@ export const addCatalogueToTrip = createServerFn({ method: "POST" })
     });
     return { ok: true, id: act.id };
   });
+
+// ============================================================
+// Crew: join by code + host approval
+// ============================================================
+type TripSummary = {
+  id: string; name: string; destination: string;
+  start_date: string; end_date: string;
+  cover_image_url: string | null; occasion: string | null;
+};
+type JoinRequestRow = {
+  id: string; trip_id: string; user_id: string; status: string;
+  message: string | null; created_at: string; decided_at: string | null; decided_by: string | null;
+};
+type Requester = { id: string; full_name: string | null; avatar_url: string | null; email: string | null };
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const adminAny = supabaseAdmin as any;
+
+export const getTripByCode = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ code: z.string().min(4).max(40) }))
+  .handler(async ({ data }): Promise<{ trip: TripSummary | null }> => {
+    const { data: trip } = await adminAny
+      .from("trips")
+      .select("id, name, destination, start_date, end_date, cover_image_url, occasion")
+      .eq("join_code", data.code.toLowerCase().trim())
+      .maybeSingle();
+    return { trip: (trip as TripSummary | null) ?? null };
+  });
+
+export const requestJoinTrip = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({ code: z.string().min(4).max(40), message: z.string().max(400).optional().nullable() }))
+  .handler(async ({ data, context }): Promise<{ ok: true; status: "already_member" | "pending"; tripId: string }> => {
+    const { userId } = context;
+    const { data: trip } = await adminAny.from("trips").select("id, name").eq("join_code", data.code.toLowerCase().trim()).maybeSingle();
+    if (!trip) throw new Error("Invalid invite code");
+    const tripId = String((trip as { id: string }).id);
+    const tripName = String((trip as { name: string }).name);
+    const { data: profile } = await adminAny.from("profiles").select("trip_id").eq("id", userId).maybeSingle();
+    if (profile?.trip_id === tripId) return { ok: true, status: "already_member", tripId };
+    const { error } = await adminAny.from("trip_join_requests").upsert(
+      { trip_id: tripId, user_id: userId, status: "pending", message: data.message ?? null },
+      { onConflict: "trip_id,user_id" },
+    );
+    if (error) throw new Error(error.message);
+    const { data: adminRows } = await adminAny.from("user_roles").select("user_id").eq("role", "admin");
+    for (const row of (adminRows ?? []) as Array<{ user_id: string }>) {
+      await adminAny.from("notifications").insert({
+        user_id: row.user_id, trip_id: tripId, kind: "join_request",
+        payload: { trip_name: tripName, requester_id: userId },
+      });
+    }
+    return { ok: true, status: "pending", tripId };
+  });
+
+export const listJoinRequests = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<{ requests: Array<JoinRequestRow & { requester: Requester | null }> }> => {
+    const { userId } = context;
+    const { data: role } = await adminAny.from("user_roles").select("role").eq("user_id", userId).maybeSingle();
+    if (!role) return { requests: [] };
+    const { data: profile } = await adminAny.from("profiles").select("trip_id").eq("id", userId).maybeSingle();
+    if (!profile?.trip_id) return { requests: [] };
+    const { data: reqs } = await adminAny
+      .from("trip_join_requests").select("*").eq("trip_id", profile.trip_id).order("created_at", { ascending: false });
+    const rows = (reqs ?? []) as JoinRequestRow[];
+    const ids = rows.map((r) => r.user_id);
+    let profiles: Requester[] = [];
+    if (ids.length > 0) {
+      const res = await adminAny.from("profiles").select("id, full_name, avatar_url, email").in("id", ids);
+      profiles = (res.data ?? []) as Requester[];
+    }
+    const byId = new Map(profiles.map((p) => [p.id, p]));
+    return { requests: rows.map((r) => ({ ...r, requester: byId.get(r.user_id) ?? null })) };
+  });
+
+export const decideJoinRequest = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({ request_id: z.string().uuid(), approve: z.boolean() }))
+  .handler(async ({ data, context }): Promise<{ ok: true }> => {
+    const { userId } = context;
+    const { data: role } = await adminAny.from("user_roles").select("role").eq("user_id", userId).maybeSingle();
+    if (!role) throw new Error("Host only");
+    const { data: req } = await adminAny.from("trip_join_requests").select("*").eq("id", data.request_id).maybeSingle();
+    if (!req) throw new Error("Request not found");
+    const r = req as JoinRequestRow;
+    const newStatus = data.approve ? "approved" : "rejected";
+    await adminAny.from("trip_join_requests").update({ status: newStatus, decided_at: new Date().toISOString(), decided_by: userId }).eq("id", data.request_id);
+    if (data.approve) {
+      await adminAny.from("profiles").update({ trip_id: r.trip_id }).eq("id", r.user_id);
+      const { data: hostEvents } = await adminAny.from("activities").select("id").eq("trip_id", r.trip_id).eq("is_host_event", true);
+      for (const ev of (hostEvents ?? []) as Array<{ id: string }>) {
+        await adminAny.from("event_rsvps").insert({ activity_id: ev.id, user_id: r.user_id, trip_id: r.trip_id, status: "going" });
+      }
+    }
+    await adminAny.from("notifications").insert({
+      user_id: r.user_id, trip_id: r.trip_id,
+      kind: data.approve ? "join_approved" : "join_rejected", payload: {},
+    });
+    return { ok: true };
+  });
+
+export const getMyJoinRequest = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<{ request: JoinRequestRow | null }> => {
+    const { data } = await adminAny.from("trip_join_requests").select("*").eq("user_id", context.userId).order("created_at", { ascending: false }).limit(1).maybeSingle();
+    return { request: (data as JoinRequestRow | null) ?? null };
+  });
+
+export const getMyTripJoinCode = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<{ code: string | null }> => {
+    const { supabase, userId } = context;
+    const { data: profile } = await supabase.from("profiles").select("trip_id").eq("id", userId).maybeSingle();
+    if (!profile?.trip_id) return { code: null };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: trip } = await (supabase as any).from("trips").select("join_code").eq("id", profile.trip_id).maybeSingle();
+    return { code: (trip?.join_code as string | null) ?? null };
+  });
+
+// ============================================================
+// Hybrid AI activity recommendations (cache + Gemini fallback)
+// ============================================================
+type Recommendation = {
+  catalogue_id: string | null; ai_id: string | null; title: string; description: string;
+  location: string; lat: number | null; lng: number | null; category: string;
+  image_url: string; duration_min: number; price_est_usd: number | null; booking_search_query: string;
+};
+type RecResult = { recommendations: Recommendation[]; source: "none" | "catalogue" | "cache" | "no_ai" | "ai_error" | "ai" };
+
+export const recommendActivitiesHybrid = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({
+    adventure: z.number().min(1).max(5).default(3),
+    pace: z.number().min(1).max(5).default(3),
+    popularity: z.number().min(1).max(5).default(3),
+    limit: z.number().int().min(1).max(24).default(12),
+  }))
+  .handler(async ({ data, context }): Promise<RecResult> => {
+    const { supabase, userId } = context;
+    const { data: profile } = await supabase.from("profiles").select("trip_id").eq("id", userId).maybeSingle();
+    if (!profile?.trip_id) return { recommendations: [], source: "none" as const };
+    const { data: trip } = await supabase.from("trips").select("destination").eq("id", profile.trip_id).maybeSingle();
+    const dest = (trip?.destination ?? "").toLowerCase();
+    // Bali → catalogue path (deterministic, no AI cost)
+    if (dest.includes("bali") || dest.includes("canggu") || dest.includes("ubud") || dest.includes("seminyak") || dest.includes("uluwatu")) {
+      const { BALI_CATALOGUE } = await import("@/data/bali-activities");
+      const { data: existing } = await supabase.from("activities").select("title").eq("trip_id", profile.trip_id);
+      const used = new Set((existing ?? []).map((a) => (a.title ?? "").toLowerCase()));
+      const POPULAR_IDS = new Set([
+        "morning-tegalalang", "afternoon-monkey-forest", "afternoon-uluwatu-temple",
+        "afternoon-nusa-penida", "evening-single-fin", "evening-finns-club",
+        "evening-savaya", "evening-jimbaran-seafood", "morning-mt-batur",
+      ]);
+      const scored = BALI_CATALOGUE
+        .filter((e) => !used.has(e.title.toLowerCase()))
+        .map((e) => {
+          const advScore = e.intensity === 3 ? 5 : e.intensity === 2 ? 3 : 1;
+          const paceScore = e.duration_min < 120 ? 5 : e.duration_min < 240 ? 3 : 1;
+          const popScore = POPULAR_IDS.has(e.id) ? 5 : 2;
+          const dist = Math.abs(advScore - data.adventure) + Math.abs(paceScore - data.pace) + Math.abs(popScore - data.popularity);
+          return { e, dist };
+        })
+        .sort((a, b) => a.dist - b.dist)
+        .slice(0, data.limit)
+        .map(({ e }) => ({
+          catalogue_id: e.id, ai_id: null as string | null, title: e.title, description: e.description,
+          location: e.location, lat: e.lat, lng: e.lng, category: e.category as string,
+          image_url: e.image_url, duration_min: e.duration_min, price_est_usd: null as number | null,
+          booking_search_query: `${e.title} ${trip?.destination ?? ""} book`,
+        }));
+      return { recommendations: scored, source: "catalogue" as const };
+    }
+    // AI path with cache
+    const filtersHash = `a${data.adventure}p${data.pace}v${data.popularity}`;
+    const admin = supabaseAdmin as unknown as {
+      from: (t: string) => {
+        select: (s: string) => { eq: (k: string, v: string) => { eq: (k2: string, v2: string) => { maybeSingle: () => Promise<{ data: { payload: unknown } | null }> } } };
+        upsert: (row: Record<string, unknown>, opts?: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
+      };
+    };
+    const { data: cached } = await admin.from("ai_suggestions_cache").select("payload").eq("destination", dest).eq("filters_hash", filtersHash).maybeSingle();
+    if (cached?.payload) {
+      const payload = cached.payload as Recommendation[];
+      return { recommendations: payload.slice(0, data.limit), source: "cache" as const };
+    }
+    const key = process.env.LOVABLE_API_KEY;
+    if (!key) return { recommendations: [], source: "no_ai" as const };
+    const prompt = `Suggest ${data.limit} activities a group of travelers can do in ${trip?.destination}.
+Preferences: adventure=${data.adventure}/5 (1=relaxed,5=extreme), pace=${data.pace}/5 (1=slow,5=fast), popularity=${data.popularity}/5 (1=hidden gem,5=mainstream tourist).
+Return strict JSON: { "activities": [ { "title": string, "description": string (1 sentence), "category": "food"|"activity"|"culture"|"nightlife"|"chill", "duration_min": number, "price_est_usd": number, "lat": number, "lng": number, "location": string, "booking_search_query": string } ] }
+Use real coordinates. Mix top-rated and lesser-known per the popularity setting. No invented names.`;
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-3-flash-preview",
+        messages: [
+          { role: "system", content: "You are a precise local travel guide. Reply with strict JSON only. Use real coordinates and never invent venue names." },
+          { role: "user", content: prompt },
+        ],
+        response_format: { type: "json_object" },
+      }),
+    });
+    if (!res.ok) return { recommendations: [], source: "ai_error" as const };
+    const json = (await res.json()) as { choices: Array<{ message: { content: string } }> };
+    let parsed: { activities: Array<Record<string, unknown>> } = { activities: [] };
+    try { parsed = JSON.parse(json.choices?.[0]?.message?.content ?? "{}"); } catch { /* noop */ }
+    const recs = (parsed.activities ?? []).map((a, i) => ({
+      catalogue_id: null as string | null,
+      ai_id: `ai-${filtersHash}-${i}`,
+      title: String(a.title ?? "Untitled"),
+      description: String(a.description ?? ""),
+      location: String(a.location ?? ""),
+      lat: typeof a.lat === "number" ? a.lat : null,
+      lng: typeof a.lng === "number" ? a.lng : null,
+      category: String(a.category ?? "activity"),
+      image_url: `https://source.unsplash.com/400x300/?${encodeURIComponent(String(a.title ?? trip?.destination ?? "travel"))}`,
+      duration_min: typeof a.duration_min === "number" ? a.duration_min : 120,
+      price_est_usd: typeof a.price_est_usd === "number" ? a.price_est_usd : null,
+      booking_search_query: String(a.booking_search_query ?? `${a.title} ${trip?.destination} book`),
+    }));
+    // cache
+    await admin.from("ai_suggestions_cache").upsert(
+      { destination: dest, filters_hash: filtersHash, payload: recs },
+      { onConflict: "destination,filters_hash" },
+    );
+    return { recommendations: recs.slice(0, data.limit), source: "ai" as const };
+  });
+
+export const addAiSuggestionToTrip = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({
+    day_date: z.string().min(8).max(20),
+    title: z.string().min(1).max(200),
+    description: z.string().max(2000).optional().nullable(),
+    location: z.string().max(200).optional().nullable(),
+    lat: z.number().min(-90).max(90).optional().nullable(),
+    lng: z.number().min(-180).max(180).optional().nullable(),
+    category: z.enum(["food", "activity", "culture", "nightlife", "chill", "transit", "other"]).default("activity"),
+    image_url: z.string().max(2000).optional().nullable(),
+    duration_min: z.number().int().min(15).max(1440).optional().nullable(),
+    start_time: z.string().max(10).optional().nullable(),
+    booking_url: z.string().url().max(800).optional().nullable(),
+  }))
+  .handler(async ({ data, context }) => {
+    const { userId } = context;
+    const { data: profile } = await supabaseAdmin.from("profiles").select("trip_id").eq("id", userId).maybeSingle();
+    if (!profile?.trip_id) throw new Error("No trip");
+    const { data: act, error } = await supabaseAdmin.from("activities").insert({
+      trip_id: profile.trip_id,
+      created_by: userId,
+      day_date: data.day_date,
+      title: data.title,
+      description: data.description ?? null,
+      location: data.location ?? null,
+      lat: data.lat ?? null,
+      lng: data.lng ?? null,
+      category: data.category,
+      image_url: data.image_url ?? null,
+      duration_min: data.duration_min ?? null,
+      start_time: data.start_time ?? "10:00",
+      booking_url: data.booking_url ?? null,
+      is_host_event: false,
+    }).select("id").single();
+    if (error || !act) throw new Error(error?.message ?? "Couldn't add");
+    await supabaseAdmin.from("event_rsvps").insert({
+      activity_id: act.id, user_id: userId, trip_id: profile.trip_id, status: "going",
+    });
+    return { ok: true, id: act.id };
+  });
+
+// Drag-drop reschedule
+export const moveActivity = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({
+    activity_id: z.string().uuid(),
+    day_date: z.string().min(8).max(20),
+    start_time: z.string().max(10).optional().nullable(),
+  }))
+  .handler(async ({ data, context }) => {
+    const { userId } = context;
+    const { data: act } = await supabaseAdmin.from("activities").select("created_by, is_host_event, trip_id").eq("id", data.activity_id).maybeSingle();
+    if (!act) throw new Error("Not found");
+    const { data: role } = await supabaseAdmin.from("user_roles").select("role").eq("user_id", userId).eq("role", "admin").maybeSingle();
+    if (act.is_host_event && !role) throw new Error("Host events can only be moved by the host");
+    if (!role && act.created_by !== userId) throw new Error("You can only move your own events");
+    const { error } = await supabaseAdmin.from("activities").update({
+      day_date: data.day_date,
+      start_time: data.start_time ?? null,
+    }).eq("id", data.activity_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+

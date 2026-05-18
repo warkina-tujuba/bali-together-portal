@@ -165,6 +165,30 @@ export type Database = {
           },
         ]
       }
+      ai_suggestions_cache: {
+        Row: {
+          created_at: string
+          destination: string
+          filters_hash: string
+          id: string
+          payload: Json
+        }
+        Insert: {
+          created_at?: string
+          destination: string
+          filters_hash: string
+          id?: string
+          payload: Json
+        }
+        Update: {
+          created_at?: string
+          destination?: string
+          filters_hash?: string
+          id?: string
+          payload?: Json
+        }
+        Relationships: []
+      }
       event_rsvps: {
         Row: {
           activity_id: string
@@ -416,6 +440,36 @@ export type Database = {
         }
         Relationships: []
       }
+      notifications: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          payload: Json
+          read_at: string | null
+          trip_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind: string
+          payload?: Json
+          read_at?: string | null
+          trip_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          payload?: Json
+          read_at?: string | null
+          trip_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -475,6 +529,39 @@ export type Database = {
           },
         ]
       }
+      trip_join_requests: {
+        Row: {
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          id: string
+          message: string | null
+          status: string
+          trip_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          id?: string
+          message?: string | null
+          status?: string
+          trip_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          id?: string
+          message?: string | null
+          status?: string
+          trip_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       trip_preferences: {
         Row: {
           avoid: string[]
@@ -520,6 +607,7 @@ export type Database = {
           end_date: string
           id: string
           is_active: boolean
+          join_code: string | null
           map_center_lat: number | null
           map_center_lng: number | null
           map_default_zoom: number | null
@@ -537,6 +625,7 @@ export type Database = {
           end_date: string
           id?: string
           is_active?: boolean
+          join_code?: string | null
           map_center_lat?: number | null
           map_center_lng?: number | null
           map_default_zoom?: number | null
@@ -554,6 +643,7 @@ export type Database = {
           end_date?: string
           id?: string
           is_active?: boolean
+          join_code?: string | null
           map_center_lat?: number | null
           map_center_lng?: number | null
           map_default_zoom?: number | null
