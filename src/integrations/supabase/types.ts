@@ -96,9 +96,11 @@ export type Database = {
           lat: number | null
           lng: number | null
           location: string | null
+          owner_user_id: string | null
           scale_adventure: number | null
           scale_pace: number | null
           scale_popularity: number | null
+          scope: Database["public"]["Enums"]["activity_scope"]
           sort_index: number
           start_time: string | null
           tags: string[] | null
@@ -121,9 +123,11 @@ export type Database = {
           lat?: number | null
           lng?: number | null
           location?: string | null
+          owner_user_id?: string | null
           scale_adventure?: number | null
           scale_pace?: number | null
           scale_popularity?: number | null
+          scope?: Database["public"]["Enums"]["activity_scope"]
           sort_index?: number
           start_time?: string | null
           tags?: string[] | null
@@ -146,9 +150,11 @@ export type Database = {
           lat?: number | null
           lng?: number | null
           location?: string | null
+          owner_user_id?: string | null
           scale_adventure?: number | null
           scale_pace?: number | null
           scale_popularity?: number | null
+          scope?: Database["public"]["Enums"]["activity_scope"]
           sort_index?: number
           start_time?: string | null
           tags?: string[] | null
@@ -164,6 +170,84 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      activity_seeds: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          destination_slug: string
+          est_cost_usd: number | null
+          est_duration_min: number | null
+          id: string
+          image_url: string | null
+          lat: number | null
+          lng: number | null
+          tags: string[] | null
+          title: string
+          url: string | null
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          destination_slug: string
+          est_cost_usd?: number | null
+          est_duration_min?: number | null
+          id?: string
+          image_url?: string | null
+          lat?: number | null
+          lng?: number | null
+          tags?: string[] | null
+          title: string
+          url?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          destination_slug?: string
+          est_cost_usd?: number | null
+          est_duration_min?: number | null
+          id?: string
+          image_url?: string | null
+          lat?: number | null
+          lng?: number | null
+          tags?: string[] | null
+          title?: string
+          url?: string | null
+        }
+        Relationships: []
+      }
+      activity_swipes: {
+        Row: {
+          created_at: string
+          id: string
+          payload: Json
+          suggestion_key: string
+          trip_id: string
+          user_id: string
+          verdict: Database["public"]["Enums"]["swipe_verdict"]
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          payload?: Json
+          suggestion_key: string
+          trip_id: string
+          user_id: string
+          verdict: Database["public"]["Enums"]["swipe_verdict"]
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          payload?: Json
+          suggestion_key?: string
+          trip_id?: string
+          user_id?: string
+          verdict?: Database["public"]["Enums"]["swipe_verdict"]
+        }
+        Relationships: []
       }
       ai_suggestions_cache: {
         Row: {
@@ -692,6 +776,7 @@ export type Database = {
       is_trip_admin: { Args: { _trip_id: string }; Returns: boolean }
     }
     Enums: {
+      activity_scope: "core" | "personal"
       app_role: "admin" | "guest"
       event_category:
         | "food"
@@ -703,6 +788,7 @@ export type Database = {
         | "other"
       rsvp_status: "going" | "maybe" | "declined"
       stay_kind: "hotel" | "villa" | "apartment" | "hostel" | "resort" | "other"
+      swipe_verdict: "save" | "skip" | "must"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -830,6 +916,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      activity_scope: ["core", "personal"],
       app_role: ["admin", "guest"],
       event_category: [
         "food",
@@ -842,6 +929,7 @@ export const Constants = {
       ],
       rsvp_status: ["going", "maybe", "declined"],
       stay_kind: ["hotel", "villa", "apartment", "hostel", "resort", "other"],
+      swipe_verdict: ["save", "skip", "must"],
     },
   },
 } as const
