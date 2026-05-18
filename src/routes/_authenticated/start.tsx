@@ -60,15 +60,35 @@ function StartWizard() {
   const TOTAL = 5;
   const [step, setStep] = useState(0);
 
-  // Step 1
+  // Step 1 - debounced autocomplete
   const [destQuery, setDestQuery] = useState("");
   const [hits, setHits] = useState<GeoHit[]>([]);
   const [searching, setSearching] = useState(false);
   const [picked, setPicked] = useState<GeoHit | null>(null);
+  const [showHits, setShowHits] = useState(false);
 
-  // Step 2
+  // Debounced search
+  useEffect(() => {
+    if (picked && destQuery === picked.name) return;
+    if (destQuery.trim().length < 2) { setHits([]); return; }
+    const t = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const r = await geoFn({ data: { q: destQuery } });
+        setHits((r.results ?? []).slice(0, 6).map((h: { name: string; lat: number; lng: number }) => ({
+          name: h.name, lat: h.lat, lng: h.lng,
+        })));
+        setShowHits(true);
+      } catch { /* ignore */ }
+      finally { setSearching(false); }
+    }, 280);
+    return () => clearTimeout(t);
+  }, [destQuery, geoFn, picked]);
+
+  // Step 2 - date range
   const [start, setStart] = useState<Date | undefined>();
   const [end, setEnd] = useState<Date | undefined>();
+  const range: DateRange | undefined = start ? { from: start, to: end } : undefined;
 
   // Step 3
   const [occasion, setOccasion] = useState("just-because");
@@ -82,22 +102,11 @@ function StartWizard() {
     [start, end],
   );
 
-  async function search() {
-    if (!destQuery.trim()) return;
-    setSearching(true);
-    try {
-      const r = await geoFn({ data: { q: destQuery } });
-      setHits((r.results ?? []).slice(0, 6).map((h: { name: string; lat: number; lng: number }) => ({
-        name: h.name, lat: h.lat, lng: h.lng,
-      })));
-    } catch { /* ignore */ }
-    finally { setSearching(false); }
-  }
-
   function pick(h: GeoHit) {
     setPicked(h);
     setDestQuery(h.name);
     setHits([]);
+    setShowHits(false);
   }
 
   async function handleCreate() {
