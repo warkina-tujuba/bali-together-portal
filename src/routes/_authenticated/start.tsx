@@ -57,7 +57,7 @@ function StartWizard() {
     })();
   }, [invite, acceptFn, updateFn, navigate]);
 
-  const TOTAL = 5;
+  const TOTAL = 4;
   const [step, setStep] = useState(0);
 
   // Step 1 - debounced autocomplete
@@ -90,10 +90,6 @@ function StartWizard() {
   const [end, setEnd] = useState<Date | undefined>();
   const range: DateRange | undefined = start ? { from: start, to: end } : undefined;
 
-  // Step 3
-  const [occasion, setOccasion] = useState("just-because");
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
   const [creating, setCreating] = useState(false);
   const [tripId, setTripId] = useState<string | null>(null);
 
@@ -110,27 +106,25 @@ function StartWizard() {
   }
 
   async function handleCreate() {
-    if (!picked || !start || !end || !name.trim()) {
-      toast.error("Add a name to continue");
-      return;
-    }
+    if (!picked || !start || !end) return;
     setCreating(true);
     try {
+      const city = picked.name.split(",")[0];
       const r = await createTripFn({
         data: {
-          name: name.trim(),
-          occasion,
+          name: `Trip to ${city}`,
+          occasion: "just-because",
           destination: picked.name,
           lat: picked.lat,
           lng: picked.lng,
           start_date: format(start, "yyyy-MM-dd"),
           end_date: format(end, "yyyy-MM-dd"),
-          description: description.trim() || null,
+          description: null,
         },
       });
       setTripId(r.trip.id);
       await qc.invalidateQueries();
-      setStep(3);
+      setStep(2);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't create trip");
     } finally {
@@ -167,7 +161,7 @@ function StartWizard() {
         {step === 0 && (
           <Step
             icon={<MapPin className="h-5 w-5" />}
-            eyebrow="Step 1 of 5"
+            eyebrow="Step 1 of 4"
             title="Where are you looking to go?"
             subtitle="Pick a city, country, or neighbourhood."
           >
@@ -211,7 +205,7 @@ function StartWizard() {
         {step === 1 && (
           <Step
             icon={<CalendarIcon className="h-5 w-5" />}
-            eyebrow="Step 2 of 5"
+            eyebrow="Step 2 of 4"
             title="When are you going?"
             subtitle={picked ? `Select your dates in ${picked.name.split(",")[0]}.` : "Pick start and end."}
           >
@@ -236,53 +230,22 @@ function StartWizard() {
 
         {step === 2 && (
           <Step
-            icon={<Sparkles className="h-5 w-5" />}
-            eyebrow="Step 3 of 5"
-            title="What's the occasion?"
-            subtitle="Give your trip a name your crew will recognise."
-          >
-            <div className="mt-5 space-y-5">
-              <Field label="Occasion">
-                <OccasionPicker value={occasion} onChange={setOccasion} />
-              </Field>
-              <Field label="Trip name">
-                <Input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder={`${capitalise(occasion)} in ${picked?.name?.split(",")[0] ?? "Bali"}`}
-                  className="h-12 rounded-xl"
-                />
-              </Field>
-              <Field label="Description (optional)">
-                <Textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="A weekend of beach mornings, scooter days, and one fancy dinner."
-                  className="min-h-[80px] rounded-xl"
-                />
-              </Field>
-            </div>
-          </Step>
-        )}
-
-        {step === 3 && (
-          <Step
             icon={<Plane className="h-5 w-5" />}
-            eyebrow="Step 4 of 5"
+            eyebrow="Step 3 of 4"
             title="Have you booked flights?"
             subtitle="So your crew can see when you land."
           >
             <FlightStep
               tripStart={start ? format(start, "yyyy-MM-dd") : null}
-              onDone={() => setStep(4)}
+              onDone={() => setStep(3)}
             />
           </Step>
         )}
 
-        {step === 4 && (
+        {step === 3 && (
           <Step
             icon={<Home className="h-5 w-5" />}
-            eyebrow="Step 5 of 5"
+            eyebrow="Step 4 of 4"
             title="Have you booked accommodation?"
             subtitle="We'll drop a 🏠 pin on the group map."
           >
@@ -308,20 +271,20 @@ function StartWizard() {
           <ArrowLeft className="mr-1 h-4 w-4" /> Back
         </Button>
 
-        {step === 2 ? (
-          <Button onClick={handleCreate} disabled={creating || !name.trim() || !picked || !start || !end} className="h-11 rounded-xl px-6">
-            {creating ? "Creating…" : "Create trip"} <ArrowRight className="ml-1 h-4 w-4" />
+        {step === 1 ? (
+          <Button onClick={handleCreate} disabled={creating || !picked || !start || !end} className="h-11 rounded-xl px-6">
+            {creating ? "Creating…" : "Continue"} <ArrowRight className="ml-1 h-4 w-4" />
           </Button>
-        ) : step < 3 ? (
+        ) : step === 0 ? (
           <Button
-            onClick={() => setStep(step + 1)}
-            disabled={(step === 0 && !canNext0) || (step === 1 && !canNext1)}
+            onClick={() => setStep(1)}
+            disabled={!canNext0}
             className="h-11 rounded-xl px-6"
           >
             Next <ArrowRight className="ml-1 h-4 w-4" />
           </Button>
         ) : (
-          <Button variant="ghost" onClick={step === 4 ? finish : () => setStep(step + 1)} className="rounded-xl">
+          <Button variant="ghost" onClick={step === 3 ? finish : () => setStep(step + 1)} className="rounded-xl">
             Skip for now <ArrowRight className="ml-1 h-4 w-4" />
           </Button>
         )}
