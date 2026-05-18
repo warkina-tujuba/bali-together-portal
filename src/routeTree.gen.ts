@@ -13,6 +13,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as ChooseRouteImport } from './routes/choose'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedStartRouteImport } from './routes/_authenticated/start'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedMapRouteImport } from './routes/_authenticated/map'
 import { Route as AuthenticatedItineraryRouteImport } from './routes/_authenticated/itinerary'
@@ -40,6 +41,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedStartRoute = AuthenticatedStartRouteImport.update({
+  id: '/start',
+  path: '/start',
+  getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
   id: '/onboarding',
@@ -93,6 +99,7 @@ export interface FileRoutesByFullPath {
   '/itinerary': typeof AuthenticatedItineraryRoute
   '/map': typeof AuthenticatedMapRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
+  '/start': typeof AuthenticatedStartRoute
   '/trip/new': typeof AuthenticatedTripNewRoute
 }
 export interface FileRoutesByTo {
@@ -106,6 +113,7 @@ export interface FileRoutesByTo {
   '/itinerary': typeof AuthenticatedItineraryRoute
   '/map': typeof AuthenticatedMapRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
+  '/start': typeof AuthenticatedStartRoute
   '/trip/new': typeof AuthenticatedTripNewRoute
 }
 export interface FileRoutesById {
@@ -121,6 +129,7 @@ export interface FileRoutesById {
   '/_authenticated/itinerary': typeof AuthenticatedItineraryRoute
   '/_authenticated/map': typeof AuthenticatedMapRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
+  '/_authenticated/start': typeof AuthenticatedStartRoute
   '/_authenticated/trip/new': typeof AuthenticatedTripNewRoute
 }
 export interface FileRouteTypes {
@@ -136,6 +145,7 @@ export interface FileRouteTypes {
     | '/itinerary'
     | '/map'
     | '/onboarding'
+    | '/start'
     | '/trip/new'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -149,6 +159,7 @@ export interface FileRouteTypes {
     | '/itinerary'
     | '/map'
     | '/onboarding'
+    | '/start'
     | '/trip/new'
   id:
     | '__root__'
@@ -163,6 +174,7 @@ export interface FileRouteTypes {
     | '/_authenticated/itinerary'
     | '/_authenticated/map'
     | '/_authenticated/onboarding'
+    | '/_authenticated/start'
     | '/_authenticated/trip/new'
   fileRoutesById: FileRoutesById
 }
@@ -202,6 +214,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/start': {
+      id: '/_authenticated/start'
+      path: '/start'
+      fullPath: '/start'
+      preLoaderRoute: typeof AuthenticatedStartRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/onboarding': {
       id: '/_authenticated/onboarding'
@@ -270,6 +289,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedItineraryRoute: typeof AuthenticatedItineraryRoute
   AuthenticatedMapRoute: typeof AuthenticatedMapRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
+  AuthenticatedStartRoute: typeof AuthenticatedStartRoute
   AuthenticatedTripNewRoute: typeof AuthenticatedTripNewRoute
 }
 
@@ -281,6 +301,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedItineraryRoute: AuthenticatedItineraryRoute,
   AuthenticatedMapRoute: AuthenticatedMapRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
+  AuthenticatedStartRoute: AuthenticatedStartRoute,
   AuthenticatedTripNewRoute: AuthenticatedTripNewRoute,
 }
 
