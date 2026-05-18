@@ -45,7 +45,7 @@ function TopNav() {
   return (
     <header className="sticky top-0 z-30 border-b border-border/60 bg-background/80 backdrop-blur">
       <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-3">
-        <Link to="/dashboard" className="font-display text-xl">Warkina Bali</Link>
+        <Link to="/dashboard" className="font-display text-xl">Travel Link</Link>
         <button onClick={() => supabase.auth.signOut()} className="text-xs text-muted-foreground hover:text-foreground">Sign out</button>
       </div>
     </header>
