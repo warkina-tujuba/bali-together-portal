@@ -74,8 +74,15 @@ function Landing() {
                 Enter
               </Button>
             </div>
-            <p className="mt-3 text-xs text-muted-foreground">
-              Hosting a trip? <Link to="/login" className="underline">Sign in</Link> to your portal.
+            <Button
+              size="lg"
+              className="mt-4 h-12 w-full rounded-xl text-base font-semibold uppercase tracking-wider"
+              onClick={() => navigate({ to: "/login" })}
+            >
+              Plan your trip
+            </Button>
+            <p className="mt-3 text-center text-xs text-muted-foreground">
+              Already hosting? <Link to="/login" className="underline">Sign in</Link>
             </p>
           </Card>
         </div>
