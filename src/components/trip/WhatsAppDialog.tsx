@@ -53,7 +53,7 @@ export function WhatsAppDialog({ trigger, isAdmin, inviteUrl, joined, tripName }
     setCreatingInvite(true);
     try {
       const r = await inviteFn({ data: { full_name: guestName.trim() } });
-      const link = `${window.location.origin}/onboarding?invite=${r.invite.token}`;
+      const link = `${window.location.origin}/start?invite=${r.invite.token}`;
       setMagicLink(link);
     } catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
     finally { setCreatingInvite(false); }
