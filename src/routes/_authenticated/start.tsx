@@ -95,6 +95,8 @@ function StartWizard() {
 
   const [creating, setCreating] = useState(false);
   const [tripId, setTripId] = useState<string | null>(null);
+  const [vibe, setVibe] = useState({ adventure: 50, culture: 50, budget: 50, foodie: 50, pace: 50 });
+  const [saving, setSaving] = useState(false);
 
   const nights = useMemo(
     () => (start && end ? Math.max(0, differenceInCalendarDays(end, start)) : 0),
@@ -136,10 +138,16 @@ function StartWizard() {
   }
 
   async function finish() {
+    setSaving(true);
     try {
+      await savePrefsFn({ data: { vibe } });
       await updateFn({ data: { onboarding_complete: true, onboarding_step: TOTAL } });
-    } catch { /* ignore */ }
-    navigate({ to: "/dashboard" });
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSaving(false);
+    }
+    navigate({ to: "/discover" });
   }
 
   const canNext0 = !!picked;
