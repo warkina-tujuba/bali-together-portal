@@ -1041,6 +1041,13 @@ export const getMyTripJoinCode = createServerFn({ method: "GET" })
 // ============================================================
 // Hybrid AI activity recommendations (cache + Gemini fallback)
 // ============================================================
+type Recommendation = {
+  catalogue_id: string | null; ai_id: string | null; title: string; description: string;
+  location: string; lat: number | null; lng: number | null; category: string;
+  image_url: string; duration_min: number; price_est_usd: number | null; booking_search_query: string;
+};
+type RecResult = { recommendations: Recommendation[]; source: "none" | "catalogue" | "cache" | "no_ai" | "ai_error" | "ai" };
+
 export const recommendActivitiesHybrid = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(z.object({
@@ -1049,7 +1056,7 @@ export const recommendActivitiesHybrid = createServerFn({ method: "POST" })
     popularity: z.number().min(1).max(5).default(3),
     limit: z.number().int().min(1).max(24).default(12),
   }))
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data, context }): Promise<RecResult> => {
     const { supabase, userId } = context;
     const { data: profile } = await supabase.from("profiles").select("trip_id").eq("id", userId).maybeSingle();
     if (!profile?.trip_id) return { recommendations: [], source: "none" as const };
