@@ -276,9 +276,9 @@ function StartWizard() {
           >
             <StayStep
               destination={picked?.name ?? null}
-              geoFn={geoFn}
-              parseStay={parseStay}
-              stayFn={stayFn}
+              geoFnProp={geoFn}
+              parseStayProp={parseStay}
+              stayFnProp={stayFn}
               onDone={finish}
             />
           </Step>
