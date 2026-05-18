@@ -27,7 +27,7 @@ function ChoosePage() {
     <div className="min-h-screen bg-background px-5 py-10">
       <div className="mx-auto max-w-2xl">
         <Link to="/" className="mb-8 flex items-center gap-2 font-display text-xl">
-          <img src={logo} alt="" className="h-8 w-8" />Magic Link
+          <img src={logo} alt="" className="h-8 w-8" />Travel Link
         </Link>
 
         <h1 className="font-display text-4xl sm:text-5xl">What brings you here?</h1>

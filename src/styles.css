@@ -2,14 +2,14 @@
 @source "../src";
 @import "tw-animate-css";
 
-@import url("https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Fira+Sans:wght@300;400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap");
 @import url("https://unpkg.com/leaflet@1.9.4/dist/leaflet.css");
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-display: "DM Serif Display", ui-serif, Georgia, serif;
-  --font-sans: "Fira Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Sora", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
 
   --radius-sm: calc(var(--radius) - 6px);
   --radius-md: calc(var(--radius) - 3px);
@@ -39,74 +39,106 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-ring-offset-background: var(--background);
-  --color-jungle: var(--jungle);
-  --color-terracotta: var(--terracotta);
+
+  /* Brand palette — Coastal Horizon */
+  --color-ocean: var(--ocean);
+  --color-deep: var(--deep);
   --color-sand: var(--sand);
-  --color-paper: var(--paper);
+  --color-coral: var(--coral);
+  --color-ivory: var(--ivory);
+  /* legacy alias kept to avoid breaking older references */
+  --color-jungle: var(--deep);
+  --color-terracotta: var(--coral);
+  --color-paper: var(--ivory);
 }
 
 :root {
   --radius: 1rem;
 
-  /* Uluwatu Luxe palette */
-  --jungle: oklch(0.24 0.025 152);
-  --terracotta: oklch(0.66 0.135 42);
-  --sand: oklch(0.94 0.018 78);
-  --paper: oklch(0.985 0.008 80);
+  /* Coastal Horizon palette */
+  --deep:   oklch(0.20 0.06 256);   /* #0B2545 deep navy */
+  --ocean:  oklch(0.30 0.08 257);   /* #13315C ocean */
+  --sand:   oklch(0.89 0.06 88);    /* #E9D8A6 sand */
+  --coral:  oklch(0.70 0.16 38);    /* #EE6C4D coral */
+  --ivory:  oklch(0.97 0.012 85);   /* #F7F4EC ivory */
 
-  --background: var(--paper);
-  --foreground: var(--jungle);
+  --background: var(--ivory);
+  --foreground: var(--deep);
   --card: oklch(1 0 0);
-  --card-foreground: var(--jungle);
+  --card-foreground: var(--deep);
   --popover: oklch(1 0 0);
-  --popover-foreground: var(--jungle);
-  --primary: var(--terracotta);
-  --primary-foreground: oklch(0.99 0.005 80);
+  --popover-foreground: var(--deep);
+  --primary: var(--ocean);
+  --primary-foreground: oklch(0.985 0.008 85);
   --secondary: var(--sand);
-  --secondary-foreground: var(--jungle);
-  --muted: oklch(0.95 0.012 78);
-  --muted-foreground: oklch(0.45 0.02 150);
-  --accent: var(--sand);
-  --accent-foreground: var(--jungle);
+  --secondary-foreground: var(--deep);
+  --muted: oklch(0.94 0.01 250);
+  --muted-foreground: oklch(0.48 0.03 256);
+  --accent: var(--coral);
+  --accent-foreground: oklch(0.99 0 0);
   --destructive: oklch(0.58 0.22 27);
   --destructive-foreground: oklch(0.99 0 0);
-  --border: oklch(0.9 0.012 78);
-  --input: oklch(0.92 0.012 78);
-  --ring: var(--terracotta);
+  --border: oklch(0.9 0.015 250);
+  --input: oklch(0.92 0.015 250);
+  --ring: var(--coral);
 
-  --shadow-soft: 0 1px 2px oklch(0.2 0.02 150 / 0.04), 0 8px 24px oklch(0.2 0.02 150 / 0.06);
-  --shadow-card: 0 1px 3px oklch(0.2 0.02 150 / 0.05), 0 12px 40px oklch(0.2 0.02 150 / 0.08);
+  --gradient-horizon: linear-gradient(135deg, var(--deep) 0%, var(--ocean) 55%, var(--coral) 100%);
+  --gradient-dawn: linear-gradient(180deg, var(--ivory) 0%, color-mix(in oklch, var(--sand) 40%, var(--ivory)) 100%);
+
+  --shadow-soft: 0 1px 2px oklch(0.20 0.06 256 / 0.05), 0 8px 24px oklch(0.20 0.06 256 / 0.07);
+  --shadow-card: 0 1px 3px oklch(0.20 0.06 256 / 0.06), 0 14px 44px oklch(0.20 0.06 256 / 0.10);
+  --shadow-glow: 0 12px 40px oklch(0.70 0.16 38 / 0.30);
 }
 
 .dark {
-  --background: oklch(0.18 0.018 150);
-  --foreground: oklch(0.96 0.01 80);
-  --card: oklch(0.22 0.02 150);
-  --card-foreground: oklch(0.96 0.01 80);
-  --popover: oklch(0.22 0.02 150);
-  --popover-foreground: oklch(0.96 0.01 80);
-  --primary: var(--terracotta);
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.28 0.02 150);
-  --secondary-foreground: oklch(0.96 0.01 80);
-  --muted: oklch(0.26 0.018 150);
-  --muted-foreground: oklch(0.72 0.015 80);
-  --accent: oklch(0.3 0.025 150);
-  --accent-foreground: oklch(0.96 0.01 80);
+  --background: oklch(0.16 0.04 256);
+  --foreground: oklch(0.97 0.012 85);
+  --card: oklch(0.22 0.05 256);
+  --card-foreground: oklch(0.97 0.012 85);
+  --popover: oklch(0.22 0.05 256);
+  --popover-foreground: oklch(0.97 0.012 85);
+  --primary: var(--coral);
+  --primary-foreground: oklch(0.16 0.04 256);
+  --secondary: oklch(0.28 0.05 256);
+  --secondary-foreground: oklch(0.97 0.012 85);
+  --muted: oklch(0.26 0.04 256);
+  --muted-foreground: oklch(0.72 0.02 250);
+  --accent: var(--coral);
+  --accent-foreground: oklch(0.99 0 0);
   --border: oklch(1 0 0 / 8%);
   --input: oklch(1 0 0 / 12%);
-  --ring: var(--terracotta);
+  --ring: var(--coral);
 }
 
 @layer base {
   * { border-color: var(--color-border); }
-  html, body { background-color: var(--color-background); color: var(--color-foreground); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
-  h1, h2, h3, h4, .font-display { font-family: var(--font-display); letter-spacing: -0.01em; }
+  html, body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, h4, .font-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+    font-weight: 600;
+  }
 }
 
 .shadow-card { box-shadow: var(--shadow-card); }
 .shadow-soft { box-shadow: var(--shadow-soft); }
+.shadow-glow { box-shadow: var(--shadow-glow); }
+.bg-gradient-horizon { background-image: var(--gradient-horizon); }
+.bg-gradient-dawn { background-image: var(--gradient-dawn); }
 
 /* Leaflet tweaks */
 .leaflet-container { font-family: var(--font-sans); border-radius: var(--radius-2xl); }
 .leaflet-popup-content-wrapper { border-radius: 14px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
