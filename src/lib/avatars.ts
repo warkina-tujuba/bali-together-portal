@@ -2,7 +2,12 @@
 // Uses emoji + themed gradient backgrounds to stay copyright-safe while
 // still feeling like Marvel / DC / Pokemon characters.
 
-export type AvatarUniverse = "marvel" | "dc" | "pokemon";
+// Extend the available avatar universes. In addition to the original Marvel,
+// DC and Pokémon categories, we now support an "anime" universe. This new
+// universe allows users to pick from a curated set of anime‑inspired
+// characters which can be used on the live map and throughout the app. See
+// CHARACTER_AVATARS below for the definitions.
+export type AvatarUniverse = "marvel" | "dc" | "pokemon" | "anime";
 
 export type CharacterAvatar = {
   id: string;
@@ -43,6 +48,21 @@ export const CHARACTER_AVATARS: CharacterAvatar[] = [
   { id: "pkm-mewtwo", name: "Mewtwo", emoji: "🧬", gradient: "linear-gradient(135deg,#7e22ce,#c084fc)", universe: "pokemon" },
   { id: "pkm-snorlax", name: "Snorlax", emoji: "😴", gradient: "linear-gradient(135deg,#1e3a8a,#60a5fa)", universe: "pokemon" },
   { id: "pkm-gengar", name: "Gengar", emoji: "👻", gradient: "linear-gradient(135deg,#581c87,#a855f7)", universe: "pokemon" },
+
+  // Anime
+  // These avatars take inspiration from well‑known anime heroes and icons. Each
+  // entry defines a unique emoji and colour palette that evokes the feel of
+  // the character without using any copyrighted artwork. When selecting
+  // "anime" in the AvatarPicker the user can choose from this set. Feel free
+  // to adjust or expand the list to suit your target audience.
+  { id: "anime-naruto", name: "Naruto", emoji: "🍥", gradient: "linear-gradient(135deg,#fbbf24,#f59e0b)", universe: "anime" },
+  { id: "anime-luffy", name: "Luffy", emoji: "🧢", gradient: "linear-gradient(135deg,#ef4444,#f87171)", universe: "anime" },
+  { id: "anime-goku", name: "Goku", emoji: "🟠", gradient: "linear-gradient(135deg,#f97316,#ea580c)", universe: "anime" },
+  { id: "anime-sailormoon", name: "Sailor Moon", emoji: "🌙", gradient: "linear-gradient(135deg,#fde047,#fbbf24)", universe: "anime" },
+  { id: "anime-totoro", name: "Totoro", emoji: "🌲", gradient: "linear-gradient(135deg,#64748b,#94a3b8)", universe: "anime" },
+  { id: "anime-attackontitan", name: "Eren", emoji: "🗡️", gradient: "linear-gradient(135deg,#475569,#334155)", universe: "anime" },
+  { id: "anime-demon-slayer", name: "Tanjiro", emoji: "💚", gradient: "linear-gradient(135deg,#4ade80,#16a34a)", universe: "anime" },
+  { id: "anime-ichigo", name: "Ichigo", emoji: "🍓", gradient: "linear-gradient(135deg,#dc2626,#ef4444)", universe: "anime" },
 ];
 
 const SVG_NS = "http://www.w3.org/2000/svg";

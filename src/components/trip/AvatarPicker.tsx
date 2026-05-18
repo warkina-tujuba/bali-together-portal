@@ -6,6 +6,10 @@ const TABS: { id: AvatarUniverse; label: string }[] = [
   { id: "marvel", label: "Marvel" },
   { id: "dc", label: "DC" },
   { id: "pokemon", label: "Pokémon" },
+  // Added support for anime avatars. This tab will appear in the picker
+  // allowing users to browse our curated anime avatars defined in
+  // src/lib/avatars.ts. See CHARACTER_AVATARS for the full list.
+  { id: "anime", label: "Anime" },
 ];
 
 export function AvatarPicker({
