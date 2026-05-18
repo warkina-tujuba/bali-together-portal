@@ -36,7 +36,7 @@ function Landing() {
             <img src={logo} alt="Magic Link" width={36} height={36} className="h-9 w-9" />
             <span>Magic Link</span>
           </Link>
-          <Link to="/login" className="text-sm opacity-90 hover:opacity-100">Host sign in →</Link>
+          <Link to="/login" className="rounded-full bg-white/15 px-4 py-2 text-xs font-medium uppercase tracking-[0.2em] backdrop-blur transition hover:bg-white/25">Sign in</Link>
         </div>
       </header>
 
