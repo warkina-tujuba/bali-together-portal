@@ -7,7 +7,7 @@ import { Heart, X, Star, MapPin, Clock, DollarSign, Sparkles, ExternalLink } fro
 import { recommendActivities, recordSwipe, type Suggestion } from "@/lib/recommend.functions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { toast } from "sonner";
+
 
 export const Route = createFileRoute("/_authenticated/discover")({
   component: DiscoverPage,
