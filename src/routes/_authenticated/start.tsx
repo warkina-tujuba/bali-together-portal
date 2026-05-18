@@ -242,7 +242,7 @@ function StartWizard() {
         {step === 2 && (
           <Step
             icon={<Plane className="h-5 w-5" />}
-            eyebrow="Step 3 of 4"
+            eyebrow="Step 3 of 5"
             title="Have you booked flights?"
             subtitle="So your crew can see when you land."
           >
@@ -256,7 +256,7 @@ function StartWizard() {
         {step === 3 && (
           <Step
             icon={<Home className="h-5 w-5" />}
-            eyebrow="Step 4 of 4"
+            eyebrow="Step 4 of 5"
             title="Have you booked accommodation?"
             subtitle="We'll drop a 🏠 pin on the group map."
           >
@@ -265,8 +265,25 @@ function StartWizard() {
               geoFnProp={geoFn}
               parseStayProp={parseStay}
               stayFnProp={stayFn}
-              onDone={finish}
+              onDone={() => setStep(4)}
             />
+          </Step>
+        )}
+
+        {step === 4 && (
+          <Step
+            icon={<Sparkles className="h-5 w-5" />}
+            eyebrow="Step 5 of 5"
+            title="Tell us your vibe"
+            subtitle="Slide each scale toward how you want to travel."
+          >
+            <div className="mt-6 space-y-6">
+              <VibeRow label="Relax" right="Adventure" value={vibe.adventure} onChange={(v)=>setVibe({...vibe, adventure: v})}/>
+              <VibeRow label="Party" right="Culture" value={vibe.culture} onChange={(v)=>setVibe({...vibe, culture: v})}/>
+              <VibeRow label="Budget" right="Luxury" value={vibe.budget} onChange={(v)=>setVibe({...vibe, budget: v})}/>
+              <VibeRow label="Light bites" right="Foodie" value={vibe.foodie} onChange={(v)=>setVibe({...vibe, foodie: v})}/>
+              <VibeRow label="Spontaneous" right="Planned" value={vibe.pace} onChange={(v)=>setVibe({...vibe, pace: v})}/>
+            </div>
           </Step>
         )}
       </Card>
@@ -294,12 +311,28 @@ function StartWizard() {
           >
             Next <ArrowRight className="ml-1 h-4 w-4" />
           </Button>
+        ) : step === 4 ? (
+          <Button onClick={finish} disabled={saving} className="h-11 rounded-xl px-6">
+            {saving ? "Saving…" : "See recommendations"} <Sparkles className="ml-1 h-4 w-4" />
+          </Button>
         ) : (
-          <Button variant="ghost" onClick={step === 3 ? finish : () => setStep(step + 1)} className="rounded-xl">
+          <Button variant="ghost" onClick={() => setStep(step + 1)} className="rounded-xl">
             Skip for now <ArrowRight className="ml-1 h-4 w-4" />
           </Button>
         )}
       </div>
+    </div>
+  );
+}
+
+function VibeRow({ label, right, value, onChange }: { label: string; right: string; value: number; onChange: (v: number) => void }) {
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between text-xs font-medium text-muted-foreground">
+        <span>{label}</span>
+        <span>{right}</span>
+      </div>
+      <Slider value={[value]} onValueChange={([v]) => onChange(v)} min={0} max={100} step={1} />
     </div>
   );
 }
