@@ -4,12 +4,14 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { acceptInvite } from "@/lib/trip.functions";
+import { saveTripPreferences } from "@/lib/recommend.functions";
 import { format, differenceInCalendarDays } from "date-fns";
 import { CalendarIcon, ArrowLeft, ArrowRight, MapPin, Plane, Home, Sparkles, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   createTrip, geocode, updateProfile, saveAccommodation, parseStayText,
 } from "@/lib/trip.functions";
+import { Slider } from "@/components/ui/slider";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
