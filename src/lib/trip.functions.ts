@@ -1101,7 +1101,7 @@ export const recommendActivitiesHybrid = createServerFn({ method: "POST" })
     };
     const { data: cached } = await admin.from("ai_suggestions_cache").select("payload").eq("destination", dest).eq("filters_hash", filtersHash).maybeSingle();
     if (cached?.payload) {
-      const payload = cached.payload as Array<Record<string, unknown>>;
+      const payload = cached.payload as Recommendation[];
       return { recommendations: payload.slice(0, data.limit), source: "cache" as const };
     }
     const key = process.env.LOVABLE_API_KEY;
