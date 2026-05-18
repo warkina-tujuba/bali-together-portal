@@ -46,6 +46,7 @@ function StartWizard() {
   const stayFn = useServerFn(saveAccommodation);
   const parseStay = useServerFn(parseStayText);
   const acceptFn = useServerFn(acceptInvite);
+  const savePrefsFn = useServerFn(saveTripPreferences);
 
   // If user arrived with an invite, accept it and skip the wizard
   useEffect(() => {
@@ -59,7 +60,7 @@ function StartWizard() {
     })();
   }, [invite, acceptFn, updateFn, navigate]);
 
-  const TOTAL = 4;
+  const TOTAL = 5;
   const [step, setStep] = useState(0);
 
   // Step 1 - debounced autocomplete
