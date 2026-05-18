@@ -424,18 +424,42 @@ function StayStep({
       </div>
     );
   }
+  const handleSave = async (s: Parameters<typeof stayFnProp>[0]["data"]) => {
+    await stayFnProp({ data: s });
+    onDone();
+  };
   return (
     <div className="mt-5">
-      <Tabs defaultValue="paste">
-        <TabsList className="grid w-full grid-cols-2 rounded-xl">
-          <TabsTrigger value="paste" className="rounded-lg">Paste booking</TabsTrigger>
-          <TabsTrigger value="search" className="rounded-lg">Search</TabsTrigger>
+      <Tabs defaultValue="address">
+        <TabsList className="grid w-full grid-cols-3 rounded-xl">
+          <TabsTrigger value="address" className="rounded-lg">Address</TabsTrigger>
+          <TabsTrigger value="airbnb" className="rounded-lg">Airbnb link</TabsTrigger>
+          <TabsTrigger value="booking" className="rounded-lg">Booking.com</TabsTrigger>
         </TabsList>
-        <TabsContent value="paste" className="mt-4">
-          <StayPasteForm parse={parseStayProp} geocode={geoFnProp} onSave={async (s) => { await stayFnProp({ data: s }); onDone(); }} />
+        <TabsContent value="address" className="mt-4">
+          <StayAddressForm geocode={geoFnProp} destinationHint={destination} onSave={handleSave} />
         </TabsContent>
-        <TabsContent value="search" className="mt-4">
-          <StaySearchForm geocode={geoFnProp} destinationHint={destination} onSave={async (s) => { await stayFnProp({ data: s }); onDone(); }} />
+        <TabsContent value="airbnb" className="mt-4 space-y-2">
+          <div className="rounded-xl bg-secondary/60 p-3 text-xs leading-relaxed text-muted-foreground">
+            <p className="font-medium text-foreground">How to grab your Airbnb link</p>
+            <ol className="ml-4 mt-1 list-decimal space-y-0.5">
+              <li>Open your booking in the Airbnb app or website.</li>
+              <li>Tap <strong>Share</strong> → <strong>Copy link</strong> (or copy the URL from your browser).</li>
+              <li>Paste it below — we'll pull dates, address, and a map pin automatically.</li>
+            </ol>
+          </div>
+          <StayPasteForm parse={parseStayProp} geocode={geoFnProp} onSave={handleSave} />
+        </TabsContent>
+        <TabsContent value="booking" className="mt-4 space-y-2">
+          <div className="rounded-xl bg-secondary/60 p-3 text-xs leading-relaxed text-muted-foreground">
+            <p className="font-medium text-foreground">How to grab your Booking.com link</p>
+            <ol className="ml-4 mt-1 list-decimal space-y-0.5">
+              <li>Open your confirmation email or your trip in Booking.com.</li>
+              <li>Copy the property URL (or paste the full confirmation email body).</li>
+              <li>Paste below — we'll extract property, dates, and address.</li>
+            </ol>
+          </div>
+          <StayPasteForm parse={parseStayProp} geocode={geoFnProp} onSave={handleSave} />
         </TabsContent>
       </Tabs>
       <button onClick={() => setAnswer(null)} className="mt-3 text-xs text-muted-foreground">← Back to options</button>
