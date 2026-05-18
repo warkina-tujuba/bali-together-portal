@@ -36,7 +36,7 @@ function Landing() {
             <img src={logo} alt="Magic Link" width={36} height={36} className="h-9 w-9" />
             <span>Magic Link</span>
           </Link>
-          <Link to="/login" className="text-sm opacity-90 hover:opacity-100">Host sign in →</Link>
+          <Link to="/login" className="rounded-full bg-white/15 px-4 py-2 text-xs font-medium uppercase tracking-[0.2em] backdrop-blur transition hover:bg-white/25">Sign in</Link>
         </div>
       </header>
 
@@ -51,7 +51,7 @@ function Landing() {
             One magic link.<br />The whole trip.
           </h1>
           <p className="mx-auto mt-5 max-w-xl text-base opacity-90 sm:text-lg">
-            From Bali to Tokyo to Lisbon — plan it like a Facebook event, then drop one link in email or any chat. Everyone lands in the same private portal, ready to go.
+            From Bali to Tokyo to Lisbon, plan your trip with confidence. Create and drop one link for your party to join and create together. Everyone lands in the same private portal, ready to go.
           </p>
 
           <Card className="mx-auto mt-9 w-full max-w-md rounded-3xl border-0 bg-white/95 p-5 text-left text-foreground shadow-card backdrop-blur">
@@ -74,8 +74,15 @@ function Landing() {
                 Enter
               </Button>
             </div>
-            <p className="mt-3 text-xs text-muted-foreground">
-              Hosting a trip? <Link to="/login" className="underline">Sign in</Link> to your portal.
+            <Button
+              size="lg"
+              className="mt-4 h-12 w-full rounded-xl text-base font-semibold uppercase tracking-wider"
+              onClick={() => navigate({ to: "/login" })}
+            >
+              Plan your trip
+            </Button>
+            <p className="mt-3 text-center text-xs text-muted-foreground">
+              Already hosting? <Link to="/login" className="underline">Sign in</Link>
             </p>
           </Card>
         </div>

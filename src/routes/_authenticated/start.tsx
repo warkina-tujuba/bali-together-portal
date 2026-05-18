@@ -21,8 +21,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { OccasionPicker } from "@/components/trip/OccasionPicker";
 import { FlightSmartForm } from "@/components/trip/FlightSmartForm";
 import { StayPasteForm } from "@/components/trip/StayPasteForm";
-import { StaySearchForm } from "@/components/trip/StaySearchForm";
+import { StayAddressForm } from "@/components/trip/StayAddressForm";
 import { toast } from "sonner";
+import type { DateRange } from "react-day-picker";
 
 const searchSchema = z.object({ invite: z.string().optional() });
 
@@ -59,15 +60,35 @@ function StartWizard() {
   const TOTAL = 5;
   const [step, setStep] = useState(0);
 
-  // Step 1
+  // Step 1 - debounced autocomplete
   const [destQuery, setDestQuery] = useState("");
   const [hits, setHits] = useState<GeoHit[]>([]);
   const [searching, setSearching] = useState(false);
   const [picked, setPicked] = useState<GeoHit | null>(null);
+  const [showHits, setShowHits] = useState(false);
 
-  // Step 2
+  // Debounced search
+  useEffect(() => {
+    if (picked && destQuery === picked.name) return;
+    if (destQuery.trim().length < 2) { setHits([]); return; }
+    const t = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const r = await geoFn({ data: { q: destQuery } });
+        setHits((r.results ?? []).slice(0, 6).map((h: { name: string; lat: number; lng: number }) => ({
+          name: h.name, lat: h.lat, lng: h.lng,
+        })));
+        setShowHits(true);
+      } catch { /* ignore */ }
+      finally { setSearching(false); }
+    }, 280);
+    return () => clearTimeout(t);
+  }, [destQuery, geoFn, picked]);
+
+  // Step 2 - date range
   const [start, setStart] = useState<Date | undefined>();
   const [end, setEnd] = useState<Date | undefined>();
+  const range: DateRange | undefined = start ? { from: start, to: end } : undefined;
 
   // Step 3
   const [occasion, setOccasion] = useState("just-because");
@@ -81,22 +102,11 @@ function StartWizard() {
     [start, end],
   );
 
-  async function search() {
-    if (!destQuery.trim()) return;
-    setSearching(true);
-    try {
-      const r = await geoFn({ data: { q: destQuery } });
-      setHits((r.results ?? []).slice(0, 6).map((h: { name: string; lat: number; lng: number }) => ({
-        name: h.name, lat: h.lat, lng: h.lng,
-      })));
-    } catch { /* ignore */ }
-    finally { setSearching(false); }
-  }
-
   function pick(h: GeoHit) {
     setPicked(h);
     setDestQuery(h.name);
     setHits([]);
+    setShowHits(false);
   }
 
   async function handleCreate() {
@@ -165,22 +175,17 @@ function StartWizard() {
               <div className="relative">
                 <Input
                   value={destQuery}
-                  onChange={(e) => { setDestQuery(e.target.value); setPicked(null); }}
-                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); search(); } }}
-                  placeholder="e.g. Canggu, Bali"
-                  className="h-14 rounded-xl pr-24 text-base"
+                  onChange={(e) => { setDestQuery(e.target.value); setPicked(null); setShowHits(true); }}
+                  onFocus={() => setShowHits(true)}
+                  placeholder="Start typing… e.g. Canggu, Bali"
+                  className="h-14 rounded-xl pr-12 text-base"
                   autoFocus
                 />
-                <Button
-                  size="sm"
-                  onClick={search}
-                  disabled={searching || !destQuery.trim()}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg"
-                >
-                  {searching ? "…" : "Search"}
-                </Button>
+                {searching && (
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">…</div>
+                )}
               </div>
-              {hits.length > 0 && (
+              {showHits && hits.length > 0 && !picked && (
                 <div className="overflow-hidden rounded-xl border">
                   {hits.map((h, i) => (
                     <button
@@ -207,16 +212,23 @@ function StartWizard() {
           <Step
             icon={<CalendarIcon className="h-5 w-5" />}
             eyebrow="Step 2 of 5"
-            title="What are your dates?"
-            subtitle={picked ? `When in ${picked.name}?` : "Pick start and end."}
+            title="When are you going?"
+            subtitle={picked ? `Select your dates in ${picked.name.split(",")[0]}.` : "Pick start and end."}
           >
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <DateField label="Start" value={start} onChange={setStart} />
-              <DateField label="End" value={end} onChange={setEnd} minDate={start} />
+            <div className="mt-5 flex justify-center rounded-2xl border bg-secondary/30 p-2">
+              <Calendar
+                mode="range"
+                numberOfMonths={2}
+                selected={range}
+                onSelect={(r) => { setStart(r?.from); setEnd(r?.to); }}
+                disabled={(d) => d < new Date(new Date().setHours(0,0,0,0))}
+                initialFocus
+                className={cn("pointer-events-auto")}
+              />
             </div>
             {start && end && (
-              <p className="mt-4 text-sm text-muted-foreground">
-                {nights} {nights === 1 ? "night" : "nights"} in {picked?.name ?? "destination"}.
+              <p className="mt-4 text-center text-sm text-muted-foreground">
+                <strong className="text-foreground">{format(start, "MMM d")}</strong> → <strong className="text-foreground">{format(end, "MMM d, yyyy")}</strong> · {nights} {nights === 1 ? "night" : "nights"}
               </p>
             )}
           </Step>
@@ -412,18 +424,42 @@ function StayStep({
       </div>
     );
   }
+  const handleSave = async (s: Parameters<typeof stayFnProp>[0]["data"]) => {
+    await stayFnProp({ data: s });
+    onDone();
+  };
   return (
     <div className="mt-5">
-      <Tabs defaultValue="paste">
-        <TabsList className="grid w-full grid-cols-2 rounded-xl">
-          <TabsTrigger value="paste" className="rounded-lg">Paste booking</TabsTrigger>
-          <TabsTrigger value="search" className="rounded-lg">Search</TabsTrigger>
+      <Tabs defaultValue="address">
+        <TabsList className="grid w-full grid-cols-3 rounded-xl">
+          <TabsTrigger value="address" className="rounded-lg">Address</TabsTrigger>
+          <TabsTrigger value="airbnb" className="rounded-lg">Airbnb link</TabsTrigger>
+          <TabsTrigger value="booking" className="rounded-lg">Booking.com</TabsTrigger>
         </TabsList>
-        <TabsContent value="paste" className="mt-4">
-          <StayPasteForm parse={parseStayProp} geocode={geoFnProp} onSave={async (s) => { await stayFnProp({ data: s }); onDone(); }} />
+        <TabsContent value="address" className="mt-4">
+          <StayAddressForm geocode={geoFnProp} destinationHint={destination} onSave={handleSave} />
         </TabsContent>
-        <TabsContent value="search" className="mt-4">
-          <StaySearchForm geocode={geoFnProp} destinationHint={destination} onSave={async (s) => { await stayFnProp({ data: s }); onDone(); }} />
+        <TabsContent value="airbnb" className="mt-4 space-y-2">
+          <div className="rounded-xl bg-secondary/60 p-3 text-xs leading-relaxed text-muted-foreground">
+            <p className="font-medium text-foreground">How to grab your Airbnb link</p>
+            <ol className="ml-4 mt-1 list-decimal space-y-0.5">
+              <li>Open your booking in the Airbnb app or website.</li>
+              <li>Tap <strong>Share</strong> → <strong>Copy link</strong> (or copy the URL from your browser).</li>
+              <li>Paste it below — we'll pull dates, address, and a map pin automatically.</li>
+            </ol>
+          </div>
+          <StayPasteForm parse={parseStayProp} geocode={geoFnProp} onSave={handleSave} />
+        </TabsContent>
+        <TabsContent value="booking" className="mt-4 space-y-2">
+          <div className="rounded-xl bg-secondary/60 p-3 text-xs leading-relaxed text-muted-foreground">
+            <p className="font-medium text-foreground">How to grab your Booking.com link</p>
+            <ol className="ml-4 mt-1 list-decimal space-y-0.5">
+              <li>Open your confirmation email or your trip in Booking.com.</li>
+              <li>Copy the property URL (or paste the full confirmation email body).</li>
+              <li>Paste below — we'll extract property, dates, and address.</li>
+            </ol>
+          </div>
+          <StayPasteForm parse={parseStayProp} geocode={geoFnProp} onSave={handleSave} />
         </TabsContent>
       </Tabs>
       <button onClick={() => setAnswer(null)} className="mt-3 text-xs text-muted-foreground">← Back to options</button>
