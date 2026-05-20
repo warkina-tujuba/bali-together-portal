@@ -83,6 +83,7 @@ export type Database = {
         Row: {
           booking_url: string | null
           category: Database["public"]["Enums"]["event_category"]
+          cost_usd: number | null
           cover_image_url: string | null
           created_at: string
           created_by: string | null
@@ -106,10 +107,12 @@ export type Database = {
           tags: string[] | null
           title: string
           trip_id: string
+          website_url: string | null
         }
         Insert: {
           booking_url?: string | null
           category?: Database["public"]["Enums"]["event_category"]
+          cost_usd?: number | null
           cover_image_url?: string | null
           created_at?: string
           created_by?: string | null
@@ -133,10 +136,12 @@ export type Database = {
           tags?: string[] | null
           title: string
           trip_id: string
+          website_url?: string | null
         }
         Update: {
           booking_url?: string | null
           category?: Database["public"]["Enums"]["event_category"]
+          cost_usd?: number | null
           cover_image_url?: string | null
           created_at?: string
           created_by?: string | null
@@ -160,6 +165,7 @@ export type Database = {
           tags?: string[] | null
           title?: string
           trip_id?: string
+          website_url?: string | null
         }
         Relationships: [
           {
@@ -612,6 +618,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      route_legs: {
+        Row: {
+          dest_lat: number
+          dest_lng: number
+          distance_km: number
+          duration_min: number
+          fetched_at: string
+          hour_bucket: number
+          id: string
+          mode: string
+          origin_lat: number
+          origin_lng: number
+          polyline: string | null
+        }
+        Insert: {
+          dest_lat: number
+          dest_lng: number
+          distance_km: number
+          duration_min: number
+          fetched_at?: string
+          hour_bucket: number
+          id?: string
+          mode?: string
+          origin_lat: number
+          origin_lng: number
+          polyline?: string | null
+        }
+        Update: {
+          dest_lat?: number
+          dest_lng?: number
+          distance_km?: number
+          duration_min?: number
+          fetched_at?: string
+          hour_bucket?: number
+          id?: string
+          mode?: string
+          origin_lat?: number
+          origin_lng?: number
+          polyline?: string | null
+        }
+        Relationships: []
       }
       trip_join_requests: {
         Row: {
