@@ -6,16 +6,22 @@ import {
   getItineraryHome, isAdmin as isAdminFn, setRsvp,
   recommendActivities, addCatalogueToTrip, createMagicLink,
 } from "@/lib/trip.functions";
+import {
+  optimiseDay, applyDaySchedule, createCustomActivity, updateActivitySchedule,
+} from "@/lib/routing.functions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
-  Crown, Users, MapPin, Sparkles, Check, Plus, ExternalLink,
+  Crown, Users, MapPin, Sparkles, Plus,
   Copy, AlertCircle, Plane, Home as HomeIcon, MessageCircle,
 } from "lucide-react";
-import { ItineraryMap } from "@/components/dashboard/ItineraryMap";
+import { SnapMap, type SnapPin, type SnapAvatar } from "@/components/dashboard/SnapMap";
+import { WeekCalendar, type CalActivity } from "@/components/dashboard/WeekCalendar";
+import { AddActivitySheet } from "@/components/dashboard/AddActivitySheet";
+import { ActivityDetailDrawer, type DrawerActivity } from "@/components/dashboard/ActivityDetailDrawer";
+import { OptimiseDialog } from "@/components/dashboard/OptimiseDialog";
 import { HostEventDialog } from "@/components/trip/HostEventDialog";
 import { FlightDialog } from "@/components/trip/FlightDialog";
 import { StayDialog } from "@/components/trip/StayDialog";
@@ -65,6 +71,10 @@ function Dashboard() {
   const recFn = useServerFn(recommendActivities);
   const addCat = useServerFn(addCatalogueToTrip);
   const magicFn = useServerFn(createMagicLink);
+  const optimiseFn = useServerFn(optimiseDay);
+  const applyFn = useServerFn(applyDaySchedule);
+  const createActFn = useServerFn(createCustomActivity);
+  const moveActFn = useServerFn(updateActivitySchedule);
   const qc = useQueryClient();
 
   const { data, isLoading } = useQuery({ queryKey: ["itineraryHome"], queryFn: () => homeFn() });
@@ -76,6 +86,15 @@ function Dashboard() {
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
+  // Add / detail / optimise state
+  const [addOpen, setAddOpen] = useState(false);
+  const [addStart, setAddStart] = useState("09:00");
+  const [addDay, setAddDay] = useState<string | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const [optOpen, setOptOpen] = useState(false);
+  const [optProposal, setOptProposal] = useState<{ proposed: { id: string; start_time: string; end_time: string }[]; before: number; after: number } | null>(null);
+  const [optLoading, setOptLoading] = useState(false);
+
   const { data: recs } = useQuery({
     queryKey: ["recs", adventure, pace, popularity],
     queryFn: () => recFn({ data: { adventure, pace, popularity, limit: 12 } }),
@@ -86,6 +105,7 @@ function Dashboard() {
 
   const days = useMemo(() => data?.trip ? dateRange(data.trip.start_date, data.trip.end_date) : [], [data?.trip]);
   const activeDay = selectedDay ?? days[0];
+
 
   const activitiesByDay = useMemo(() => {
     const map = new Map<string, Activity[]>();
@@ -242,101 +262,70 @@ function Dashboard() {
         })}
       </div>
 
-      {/* Split: list left / map right */}
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_520px]">
-        {/* LEFT: day plan + recommendations */}
+      {/* Split: calendar 60 / map 40 */}
+      <div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
+        {/* LEFT: week calendar */}
         <div className="min-w-0 space-y-4">
+          <WeekCalendar
+            days={days}
+            activities={(data.activities ?? []).map((a: Activity): CalActivity => ({
+              id: a.id,
+              day_date: a.day_date,
+              start_time: a.start_time,
+              end_time: a.end_time,
+              duration_min: (a as Activity & { duration_min?: number | null }).duration_min ?? 60,
+              title: a.title,
+              location: a.location,
+              is_host_event: a.is_host_event,
+              lat: a.lat,
+              lng: a.lng,
+            }))}
+            legsByDay={new Map()}
+            selectedDay={activeDay}
+            onSelectDay={(d) => setSelectedDay(d)}
+            onSlotClick={(d, hm) => {
+              const hh = String(Math.floor(hm / 60)).padStart(2, "0");
+              const mm = String(hm % 60).padStart(2, "0");
+              setAddDay(d);
+              setAddStart(`${hh}:${mm}`);
+              setAddOpen(true);
+            }}
+            onActivityClick={(id) => { setDetailId(id); setFocusedId(id); }}
+            onActivityDrop={async (id, d, hm) => {
+              const hh = String(Math.floor(hm / 60)).padStart(2, "0");
+              const mm = String(hm % 60).padStart(2, "0");
+              try {
+                const act = (data.activities ?? []).find((a: Activity) => a.id === id);
+                await moveActFn({ data: {
+                  id, day_date: d, start_time: `${hh}:${mm}`,
+                  duration_min: (act as Activity & { duration_min?: number | null })?.duration_min ?? 60,
+                } });
+                qc.invalidateQueries({ queryKey: ["itineraryHome"] });
+              } catch (e) { toast.error(e instanceof Error ? e.message : "Couldn't move"); }
+            }}
+            onOptimise={async (d) => {
+              setOptLoading(true); setOptOpen(true);
+              try {
+                const r = await optimiseFn({ data: { day_date: d } });
+                setOptProposal({ proposed: r.proposed, before: r.before_drive_min, after: r.after_drive_min });
+              } catch (e) {
+                toast.error(e instanceof Error ? e.message : "Couldn't optimise");
+                setOptOpen(false);
+              } finally { setOptLoading(false); }
+            }}
+          />
+
+          {/* Recommendations */}
           <Card className="rounded-3xl border-0 p-4 shadow-soft sm:p-5">
-            <div className="flex items-center justify-between">
-              <h2 className="font-display text-2xl">
-                {new Date(activeDay).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}
-              </h2>
-              {isAdmin && <HostEventDialog defaultDate={activeDay} tripDays={days} trigger={
-                <Button size="sm" variant="ghost" className="rounded-full"><Crown className="mr-1 h-3.5 w-3.5" />Host event</Button>
-              } />}
+            <div>
+              <h2 className="font-display text-2xl flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" />Recommended for your crew</h2>
+              <p className="text-xs text-muted-foreground">Tune the dials — picks update live. Add to <strong>{new Date(activeDay).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</strong>.</p>
             </div>
-
-            <div className="mt-3 space-y-3">
-              {(activitiesByDay.get(activeDay) ?? []).length === 0 && (
-                <p className="rounded-2xl bg-secondary p-4 text-sm text-muted-foreground">
-                  Nothing scheduled for this day yet. Pick something from the recommendations below, or have your host add an event.
-                </p>
-              )}
-              {(activitiesByDay.get(activeDay) ?? []).map((a) => {
-                const rsvps = rsvpsByActivity.get(a.id) ?? [];
-                const going = rsvps.filter((r) => r.status === "going");
-                const maybe = rsvps.filter((r) => r.status === "maybe");
-                const myRsvp = rsvps.find((r) => r.user_id === data.userId)?.status;
-                const creator = a.created_by ? memberById.get(a.created_by) : null;
-                return (
-                  <div key={a.id} onMouseEnter={() => setFocusedId(a.id)} className={`overflow-hidden rounded-2xl border ${a.is_host_event ? "border-primary/60 bg-primary/5" : "border-border bg-background"}`}>
-                    <div className="flex">
-                      {a.image_url && (
-                        <img src={a.image_url} alt="" className="hidden h-24 w-24 shrink-0 object-cover sm:block" />
-                      )}
-                      <div className="min-w-0 flex-1 p-3">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              {a.is_host_event && <Badge className="bg-primary text-primary-foreground"><Crown className="mr-1 h-3 w-3" />Hosted</Badge>}
-                              {a.start_time && <span className="text-xs font-medium text-muted-foreground tabular-nums">{a.start_time.slice(0, 5)}{a.end_time ? ` – ${a.end_time.slice(0, 5)}` : ""}</span>}
-                            </div>
-                            <h3 className="mt-1 line-clamp-1 font-medium">{a.title}</h3>
-                            {a.location && <p className="line-clamp-1 text-xs text-muted-foreground"><MapPin className="mr-1 inline h-3 w-3" />{a.location}</p>}
-                            {creator && <p className="mt-0.5 text-[11px] text-muted-foreground">Added by {creator.full_name ?? "a guest"}</p>}
-                          </div>
-                          {a.booking_url && (
-                            <a href={a.booking_url} target="_blank" rel="noreferrer" className="shrink-0 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium">
-                              Book <ExternalLink className="ml-0.5 inline h-3 w-3" />
-                            </a>
-                          )}
-                        </div>
-                        <div className="mt-2 flex items-center justify-between gap-2">
-                          <div className="flex -space-x-1.5">
-                            {going.slice(0, 6).map((r) => {
-                              const m = memberById.get(r.user_id);
-                              return (
-                                <div key={r.user_id} title={m?.full_name ?? "Guest"} className="h-6 w-6 overflow-hidden rounded-full border-2 border-background bg-secondary text-[10px] font-medium flex items-center justify-center">
-                                  {m?.avatar_url ? <img src={m.avatar_url} alt="" className="h-full w-full object-cover" /> : (m?.full_name?.[0] ?? "?")}
-                                </div>
-                              );
-                            })}
-                            {going.length > 6 && <span className="ml-2 text-xs text-muted-foreground">+{going.length - 6}</span>}
-                            {going.length === 0 && <span className="text-xs text-muted-foreground">No-one's in yet</span>}
-                            {maybe.length > 0 && <span className="ml-3 text-xs text-muted-foreground">· {maybe.length} interested</span>}
-                          </div>
-                          <div className="flex gap-1">
-                            <Button size="sm" variant={myRsvp === "going" ? "default" : "outline"} className="h-7 rounded-full px-3 text-xs" onClick={() => handleRsvp(a.id, "going")}>
-                              {myRsvp === "going" ? <><Check className="mr-1 h-3 w-3" />Going</> : "Join"}
-                            </Button>
-                            <Button size="sm" variant={myRsvp === "maybe" ? "secondary" : "ghost"} className="h-7 rounded-full px-3 text-xs" onClick={() => handleRsvp(a.id, "maybe")}>
-                              Interested
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </Card>
-
-          {/* Recommendations + sliders */}
-          <Card className="rounded-3xl border-0 p-4 shadow-soft sm:p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="font-display text-2xl flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" />Recommended for your crew</h2>
-                <p className="text-xs text-muted-foreground">Tune the dials — picks update live. Add to <strong>{new Date(activeDay).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</strong>.</p>
-              </div>
-            </div>
-
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
               <ScaleSlider label="Adventure" left="Relaxed" right="Adventure" value={adventure} onChange={setAdventure} />
               <ScaleSlider label="Pace" left="Slow" right="Fast" value={pace} onChange={setPace} />
               <ScaleSlider label="Vibe" left="Hidden gems" right="Popular" value={popularity} onChange={setPopularity} />
             </div>
-
             <div className="-mx-1 mt-4 flex gap-3 overflow-x-auto px-1 pb-2">
               {(recs?.recommendations ?? []).map((r) => (
                 <div key={r.catalogue_id} className="w-56 shrink-0 overflow-hidden rounded-2xl border bg-background">
@@ -375,13 +364,80 @@ function Dashboard() {
           </Card>
         </div>
 
-        {/* RIGHT: sticky map */}
+        {/* RIGHT: SnapMap */}
         <div className="lg:sticky lg:top-20 lg:h-[calc(100vh-9rem)]">
           <Card className="h-[55vh] overflow-hidden rounded-3xl border-0 shadow-card lg:h-full">
-            <ItineraryMap center={center} zoom={trip.map_default_zoom ?? 11} pins={mapPins} focusedId={focusedId} />
+            <SnapMap
+              center={center}
+              zoom={trip.map_default_zoom ?? 11}
+              pins={mapPins as SnapPin[]}
+              avatars={[]}
+              focusedId={focusedId}
+              onPinClick={(id) => { if (!id.startsWith("stay-")) setDetailId(id); }}
+            />
           </Card>
         </div>
       </div>
+
+      {/* Add activity sheet */}
+      {addDay && (
+        <AddActivitySheet
+          open={addOpen}
+          onOpenChange={setAddOpen}
+          defaultDay={addDay}
+          defaultStart={addStart}
+          onSubmit={async (payload) => {
+            try {
+              await createActFn({ data: payload });
+              toast.success("Added to your plan");
+              qc.invalidateQueries({ queryKey: ["itineraryHome"] });
+            } catch (e) { toast.error(e instanceof Error ? e.message : "Couldn't add"); }
+          }}
+        />
+      )}
+
+      {/* Activity detail drawer */}
+      <ActivityDetailDrawer
+        open={!!detailId}
+        onOpenChange={(b) => { if (!b) setDetailId(null); }}
+        activity={(() => {
+          const a = (data.activities ?? []).find((x: Activity) => x.id === detailId);
+          if (!a) return null;
+          const ext = a as Activity & { duration_min?: number | null; website_url?: string | null; cost_usd?: number | null };
+          return {
+            id: a.id, title: a.title, description: a.description, location: a.location,
+            start_time: a.start_time, end_time: a.end_time,
+            duration_min: ext.duration_min ?? null,
+            image_url: a.image_url, booking_url: a.booking_url,
+            website_url: ext.website_url ?? null, cost_usd: ext.cost_usd ?? null,
+            is_host_event: a.is_host_event, lat: a.lat, lng: a.lng,
+          } as DrawerActivity;
+        })()}
+        myRsvp={(() => {
+          if (!detailId) return null;
+          const r = (data.rsvps ?? []).find((rr: Rsvp) => rr.activity_id === detailId && rr.user_id === data.userId);
+          return r?.status ?? null;
+        })()}
+        onRsvp={handleRsvp}
+      />
+
+      {/* Optimise dialog */}
+      <OptimiseDialog
+        open={optOpen}
+        onOpenChange={setOptOpen}
+        beforeMin={optProposal?.before ?? 0}
+        afterMin={optProposal?.after ?? 0}
+        loading={optLoading}
+        onAccept={async () => {
+          if (!optProposal) return;
+          try {
+            await applyFn({ data: { updates: optProposal.proposed } });
+            toast.success("Day optimised");
+            qc.invalidateQueries({ queryKey: ["itineraryHome"] });
+            setOptOpen(false);
+          } catch (e) { toast.error(e instanceof Error ? e.message : "Couldn't apply"); }
+        }}
+      />
     </main>
   );
 }
