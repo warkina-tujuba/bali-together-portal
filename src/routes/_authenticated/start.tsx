@@ -147,38 +147,12 @@ function StartWizard() {
         {step === 0 && (
           <Step
             icon={<MapPin className="h-5 w-5" />}
-            eyebrow="Step 1 of 5"
+            eyebrow="Step 1 of 6"
             title="Where are you looking to go?"
             subtitle="Pick a city, country, or neighbourhood."
           >
             <div className="mt-5 space-y-3">
-              <div className="relative">
-                <Input
-                  value={destQuery}
-                  onChange={(e) => { setDestQuery(e.target.value); setPicked(null); setShowHits(true); }}
-                  onFocus={() => setShowHits(true)}
-                  placeholder="Start typing… e.g. Canggu, Bali"
-                  className="h-14 rounded-xl pr-12 text-base"
-                  autoFocus
-                />
-                {searching && (
-                  <div className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">…</div>
-                )}
-              </div>
-              {showHits && hits.length > 0 && !picked && (
-                <div className="overflow-hidden rounded-xl border">
-                  {hits.map((h, i) => (
-                    <button
-                      key={i}
-                      onClick={() => pick(h)}
-                      className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm hover:bg-secondary"
-                    >
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <span>{h.name}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
+              <PlaceAutocomplete value={picked} onPick={setPicked} autoFocus />
               {picked && (
                 <div className="flex items-center gap-2 rounded-xl bg-secondary px-4 py-3 text-sm">
                   <Check className="h-4 w-4 text-primary" /> Heading to <strong>{picked.name}</strong>
@@ -191,14 +165,14 @@ function StartWizard() {
         {step === 1 && (
           <Step
             icon={<CalendarIcon className="h-5 w-5" />}
-            eyebrow="Step 2 of 5"
+            eyebrow="Step 2 of 6"
             title="When are you going?"
             subtitle={picked ? `Select your dates in ${picked.name.split(",")[0]}.` : "Pick start and end."}
           >
-            <div className="mt-5 flex justify-center rounded-2xl border bg-secondary/30 p-2">
+            <div className="mt-5 flex justify-center">
               <Calendar
                 mode="range"
-                numberOfMonths={2}
+                numberOfMonths={1}
                 selected={range}
                 onSelect={(r) => { setStart(r?.from); setEnd(r?.to); }}
                 disabled={(d) => d < new Date(new Date().setHours(0,0,0,0))}
@@ -207,9 +181,14 @@ function StartWizard() {
               />
             </div>
             {start && end && (
-              <p className="mt-4 text-center text-sm text-muted-foreground">
-                <strong className="text-foreground">{format(start, "MMM d")}</strong> → <strong className="text-foreground">{format(end, "MMM d, yyyy")}</strong> · {nights} {nights === 1 ? "night" : "nights"}
-              </p>
+              <div className="mt-4 flex justify-center">
+                <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-2 text-sm">
+                  <strong>{format(start, "MMM d")}</strong>
+                  <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                  <strong>{format(end, "MMM d, yyyy")}</strong>
+                  <span className="text-muted-foreground">· {nights} {nights === 1 ? "night" : "nights"}</span>
+                </div>
+              </div>
             )}
           </Step>
         )}
@@ -217,7 +196,7 @@ function StartWizard() {
         {step === 2 && (
           <Step
             icon={<Plane className="h-5 w-5" />}
-            eyebrow="Step 3 of 5"
+            eyebrow="Step 3 of 6"
             title="Have you booked flights?"
             subtitle="So your crew can see when you land."
           >
@@ -231,7 +210,7 @@ function StartWizard() {
         {step === 3 && (
           <Step
             icon={<Home className="h-5 w-5" />}
-            eyebrow="Step 4 of 5"
+            eyebrow="Step 4 of 6"
             title="Have you booked accommodation?"
             subtitle="We'll drop a 🏠 pin on the group map."
           >
@@ -248,7 +227,7 @@ function StartWizard() {
         {step === 4 && (
           <Step
             icon={<Sparkles className="h-5 w-5" />}
-            eyebrow="Step 5 of 5"
+            eyebrow="Step 5 of 6"
             title="Tell us your vibe"
             subtitle="Slide each scale toward how you want to travel."
           >
@@ -258,6 +237,19 @@ function StartWizard() {
               <VibeRow label="Budget" right="Luxury" value={vibe.budget} onChange={(v)=>setVibe({...vibe, budget: v})}/>
               <VibeRow label="Light bites" right="Foodie" value={vibe.foodie} onChange={(v)=>setVibe({...vibe, foodie: v})}/>
               <VibeRow label="Spontaneous" right="Planned" value={vibe.pace} onChange={(v)=>setVibe({...vibe, pace: v})}/>
+            </div>
+          </Step>
+        )}
+
+        {step === 5 && (
+          <Step
+            icon={<User className="h-5 w-5" />}
+            eyebrow="Step 6 of 6"
+            title="Pick your avatar"
+            subtitle="Choose a character — this is how the crew will see you on the map."
+          >
+            <div className="mt-5">
+              <AvatarPicker value={avatarUrl} onChange={(url) => setAvatarUrl(url)} />
             </div>
           </Step>
         )}
