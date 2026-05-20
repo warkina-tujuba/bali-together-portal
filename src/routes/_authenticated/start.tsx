@@ -62,33 +62,11 @@ function StartWizard() {
     })();
   }, [invite, acceptFn, updateFn, navigate]);
 
-  const TOTAL = 5;
+  const TOTAL = 6;
   const [step, setStep] = useState(0);
 
-  // Step 1 - debounced autocomplete
-  const [destQuery, setDestQuery] = useState("");
-  const [hits, setHits] = useState<GeoHit[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [picked, setPicked] = useState<GeoHit | null>(null);
-  const [showHits, setShowHits] = useState(false);
-
-  // Debounced search
-  useEffect(() => {
-    if (picked && destQuery === picked.name) return;
-    if (destQuery.trim().length < 2) { setHits([]); return; }
-    const t = setTimeout(async () => {
-      setSearching(true);
-      try {
-        const r = await geoFn({ data: { q: destQuery } });
-        setHits((r.results ?? []).slice(0, 6).map((h: { name: string; lat: number; lng: number }) => ({
-          name: h.name, lat: h.lat, lng: h.lng,
-        })));
-        setShowHits(true);
-      } catch { /* ignore */ }
-      finally { setSearching(false); }
-    }, 280);
-    return () => clearTimeout(t);
-  }, [destQuery, geoFn, picked]);
+  // Step 1 destination — Mapbox browser autocomplete via PlaceAutocomplete
+  const [picked, setPicked] = useState<PlaceHit | null>(null);
 
   // Step 2 - date range
   const [start, setStart] = useState<Date | undefined>();
@@ -99,18 +77,13 @@ function StartWizard() {
   const [tripId, setTripId] = useState<string | null>(null);
   const [vibe, setVibe] = useState({ adventure: 50, culture: 50, budget: 50, foodie: 50, pace: 50 });
   const [saving, setSaving] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   const nights = useMemo(
     () => (start && end ? Math.max(0, differenceInCalendarDays(end, start)) : 0),
     [start, end],
   );
 
-  function pick(h: GeoHit) {
-    setPicked(h);
-    setDestQuery(h.name);
-    setHits([]);
-    setShowHits(false);
-  }
 
   async function handleCreate() {
     if (!picked || !start || !end) return;
