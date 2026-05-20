@@ -371,10 +371,7 @@ function Dashboard() {
               center={center}
               zoom={trip.map_default_zoom ?? 11}
               pins={mapPins as SnapPin[]}
-              avatars={(data.liveLocations ?? []).map((l: { user_id: string; lat: number; lng: number }): SnapAvatar => {
-                const m = memberById.get(l.user_id);
-                return { user_id: l.user_id, lat: l.lat, lng: l.lng, name: m?.full_name ?? "Guest", avatar_url: m?.avatar_url ?? null };
-              })}
+              avatars={[]}
               focusedId={focusedId}
               onPinClick={(id) => { if (!id.startsWith("stay-")) setDetailId(id); }}
             />
