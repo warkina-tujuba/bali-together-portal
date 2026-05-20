@@ -173,11 +173,13 @@ export const updateActivitySchedule = createServerFn({ method: "POST" })
     const [h, m] = data.start_time.split(":").map(Number);
     const endMin = h * 60 + m + data.duration_min;
     const end = `${String(Math.floor(endMin / 60) % 24).padStart(2, "0")}:${String(endMin % 60).padStart(2, "0")}`;
-    const patch: Record<string, unknown> = {
-      start_time: data.start_time, end_time: end, duration_min: data.duration_min,
-    };
-    if (data.day_date) patch.day_date = data.day_date;
-    const { error } = await supabase.from("activities").update(patch).eq("id", data.id);
+    const { error } = data.day_date
+      ? await supabase.from("activities").update({
+          start_time: data.start_time, end_time: end, duration_min: data.duration_min, day_date: data.day_date,
+        }).eq("id", data.id)
+      : await supabase.from("activities").update({
+          start_time: data.start_time, end_time: end, duration_min: data.duration_min,
+        }).eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
