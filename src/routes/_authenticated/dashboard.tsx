@@ -71,6 +71,10 @@ function Dashboard() {
   const recFn = useServerFn(recommendActivities);
   const addCat = useServerFn(addCatalogueToTrip);
   const magicFn = useServerFn(createMagicLink);
+  const optimiseFn = useServerFn(optimiseDay);
+  const applyFn = useServerFn(applyDaySchedule);
+  const createActFn = useServerFn(createCustomActivity);
+  const moveActFn = useServerFn(updateActivitySchedule);
   const qc = useQueryClient();
 
   const { data, isLoading } = useQuery({ queryKey: ["itineraryHome"], queryFn: () => homeFn() });
@@ -82,6 +86,15 @@ function Dashboard() {
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
+  // Add / detail / optimise state
+  const [addOpen, setAddOpen] = useState(false);
+  const [addStart, setAddStart] = useState("09:00");
+  const [addDay, setAddDay] = useState<string | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const [optOpen, setOptOpen] = useState(false);
+  const [optProposal, setOptProposal] = useState<{ proposed: { id: string; start_time: string; end_time: string }[]; before: number; after: number } | null>(null);
+  const [optLoading, setOptLoading] = useState(false);
+
   const { data: recs } = useQuery({
     queryKey: ["recs", adventure, pace, popularity],
     queryFn: () => recFn({ data: { adventure, pace, popularity, limit: 12 } }),
@@ -92,6 +105,7 @@ function Dashboard() {
 
   const days = useMemo(() => data?.trip ? dateRange(data.trip.start_date, data.trip.end_date) : [], [data?.trip]);
   const activeDay = selectedDay ?? days[0];
+
 
   const activitiesByDay = useMemo(() => {
     const map = new Map<string, Activity[]>();
