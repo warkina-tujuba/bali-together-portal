@@ -6,7 +6,7 @@ import { z } from "zod";
 import { acceptInvite } from "@/lib/trip.functions";
 import { saveTripPreferences } from "@/lib/recommend.functions";
 import { format, differenceInCalendarDays } from "date-fns";
-import { CalendarIcon, ArrowLeft, ArrowRight, MapPin, Plane, Home, Sparkles, Check } from "lucide-react";
+import { CalendarIcon, ArrowLeft, ArrowRight, MapPin, Plane, Home, Sparkles, Check, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   createTrip, geocode, updateProfile, saveAccommodation, parseStayText,
@@ -24,6 +24,8 @@ import { OccasionPicker } from "@/components/trip/OccasionPicker";
 import { FlightSmartForm } from "@/components/trip/FlightSmartForm";
 import { StayPasteForm } from "@/components/trip/StayPasteForm";
 import { StayAddressForm } from "@/components/trip/StayAddressForm";
+import { PlaceAutocomplete, type PlaceHit } from "@/components/trip/PlaceAutocomplete";
+import { AvatarPicker } from "@/components/trip/AvatarPicker";
 import { toast } from "sonner";
 import type { DateRange } from "react-day-picker";
 
