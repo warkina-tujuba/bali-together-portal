@@ -441,10 +441,6 @@ function Dashboard() {
           } catch (e) { toast.error(e instanceof Error ? e.message : "Couldn't apply"); }
         }}
       />
-
-          </Card>
-        </div>
-      </div>
     </main>
   );
 }
