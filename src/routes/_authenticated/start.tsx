@@ -284,8 +284,12 @@ function StartWizard() {
             Next <ArrowRight className="ml-1 h-4 w-4" />
           </Button>
         ) : step === 4 ? (
-          <Button onClick={finish} disabled={saving} className="h-11 rounded-xl px-6">
-            {saving ? "Saving…" : "See recommendations"} <Sparkles className="ml-1 h-4 w-4" />
+          <Button onClick={() => setStep(5)} className="h-11 rounded-xl px-6">
+            Next <ArrowRight className="ml-1 h-4 w-4" />
+          </Button>
+        ) : step === 5 ? (
+          <Button onClick={finish} disabled={saving || !avatarUrl} className="h-11 rounded-xl px-6">
+            {saving ? "Saving…" : "Enter the trip"} <Sparkles className="ml-1 h-4 w-4" />
           </Button>
         ) : (
           <Button variant="ghost" onClick={() => setStep(step + 1)} className="rounded-xl">
