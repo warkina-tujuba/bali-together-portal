@@ -116,13 +116,18 @@ function StartWizard() {
     setSaving(true);
     try {
       await savePrefsFn({ data: { vibe } });
-      await updateFn({ data: { onboarding_complete: true, onboarding_step: TOTAL } });
+      await updateFn({ data: {
+        onboarding_complete: true,
+        onboarding_step: TOTAL,
+        ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
+      } });
+      await qc.invalidateQueries();
     } catch (e) {
       console.error(e);
     } finally {
       setSaving(false);
     }
-    navigate({ to: "/discover" });
+    navigate({ to: "/dashboard" });
   }
 
   const canNext0 = !!picked;
