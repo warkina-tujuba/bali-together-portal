@@ -6,16 +6,22 @@ import {
   getItineraryHome, isAdmin as isAdminFn, setRsvp,
   recommendActivities, addCatalogueToTrip, createMagicLink,
 } from "@/lib/trip.functions";
+import {
+  optimiseDay, applyDaySchedule, createCustomActivity, updateActivitySchedule,
+} from "@/lib/routing.functions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
-  Crown, Users, MapPin, Sparkles, Check, Plus, ExternalLink,
+  Crown, Users, MapPin, Sparkles, Plus,
   Copy, AlertCircle, Plane, Home as HomeIcon, MessageCircle,
 } from "lucide-react";
-import { ItineraryMap } from "@/components/dashboard/ItineraryMap";
+import { SnapMap, type SnapPin, type SnapAvatar } from "@/components/dashboard/SnapMap";
+import { WeekCalendar, type CalActivity } from "@/components/dashboard/WeekCalendar";
+import { AddActivitySheet } from "@/components/dashboard/AddActivitySheet";
+import { ActivityDetailDrawer, type DrawerActivity } from "@/components/dashboard/ActivityDetailDrawer";
+import { OptimiseDialog } from "@/components/dashboard/OptimiseDialog";
 import { HostEventDialog } from "@/components/trip/HostEventDialog";
 import { FlightDialog } from "@/components/trip/FlightDialog";
 import { StayDialog } from "@/components/trip/StayDialog";
