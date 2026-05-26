@@ -54,9 +54,10 @@ function TopNav() {
 
 function BottomBar() {
   const items = [
-    { to: "/dashboard", label: "Trip" },
+    { to: "/discover", label: "Discover" },
+    { to: "/dashboard", label: "Plan" },
     { to: "/map", label: "Map" },
-    { to: "/itinerary", label: "Plan" },
+    { to: "/chat", label: "Chat" },
     { to: "/admin", label: "Host" },
   ] as const;
   return (
