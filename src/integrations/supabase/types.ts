@@ -98,11 +98,13 @@ export type Database = {
           lng: number | null
           location: string | null
           owner_user_id: string | null
+          parked: boolean
           scale_adventure: number | null
           scale_pace: number | null
           scale_popularity: number | null
           scope: Database["public"]["Enums"]["activity_scope"]
           sort_index: number
+          source_activity_id: string | null
           start_time: string | null
           tags: string[] | null
           title: string
@@ -127,11 +129,13 @@ export type Database = {
           lng?: number | null
           location?: string | null
           owner_user_id?: string | null
+          parked?: boolean
           scale_adventure?: number | null
           scale_pace?: number | null
           scale_popularity?: number | null
           scope?: Database["public"]["Enums"]["activity_scope"]
           sort_index?: number
+          source_activity_id?: string | null
           start_time?: string | null
           tags?: string[] | null
           title: string
@@ -156,11 +160,13 @@ export type Database = {
           lng?: number | null
           location?: string | null
           owner_user_id?: string | null
+          parked?: boolean
           scale_adventure?: number | null
           scale_pace?: number | null
           scale_popularity?: number | null
           scope?: Database["public"]["Enums"]["activity_scope"]
           sort_index?: number
+          source_activity_id?: string | null
           start_time?: string | null
           tags?: string[] | null
           title?: string
@@ -168,6 +174,13 @@ export type Database = {
           website_url?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "activities_source_activity_id_fkey"
+            columns: ["source_activity_id"]
+            isOneToOne: false
+            referencedRelation: "activities"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "activities_trip_id_fkey"
             columns: ["trip_id"]
@@ -189,6 +202,9 @@ export type Database = {
           image_url: string | null
           lat: number | null
           lng: number | null
+          price_band: number
+          rating: number | null
+          review_count: number
           tags: string[] | null
           title: string
           url: string | null
@@ -204,6 +220,9 @@ export type Database = {
           image_url?: string | null
           lat?: number | null
           lng?: number | null
+          price_band?: number
+          rating?: number | null
+          review_count?: number
           tags?: string[] | null
           title: string
           url?: string | null
@@ -219,11 +238,43 @@ export type Database = {
           image_url?: string | null
           lat?: number | null
           lng?: number | null
+          price_band?: number
+          rating?: number | null
+          review_count?: number
           tags?: string[] | null
           title?: string
           url?: string | null
         }
         Relationships: []
+      }
+      activity_subscriptions: {
+        Row: {
+          activity_id: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          activity_id: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          activity_id?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_subscriptions_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "activities"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       activity_swipes: {
         Row: {
@@ -824,7 +875,7 @@ export type Database = {
       is_trip_admin: { Args: { _trip_id: string }; Returns: boolean }
     }
     Enums: {
-      activity_scope: "core" | "personal"
+      activity_scope: "core" | "personal" | "shared"
       app_role: "admin" | "guest"
       event_category:
         | "food"
@@ -964,7 +1015,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      activity_scope: ["core", "personal"],
+      activity_scope: ["core", "personal", "shared"],
       app_role: ["admin", "guest"],
       event_category: [
         "food",

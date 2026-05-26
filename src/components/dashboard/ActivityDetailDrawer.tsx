@@ -1,7 +1,7 @@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Clock, MapPin, DollarSign, ExternalLink, Crown, Trash2 } from "lucide-react";
+import { Clock, MapPin, DollarSign, ExternalLink, Crown, Trash2, Users, UserPlus, UserMinus, Lock } from "lucide-react";
 
 export type DrawerActivity = {
   id: string;
@@ -18,15 +18,21 @@ export type DrawerActivity = {
   is_host_event: boolean;
   lat: number | null;
   lng: number | null;
+  scope?: "core" | "personal" | "shared" | null;
+  owner_user_id?: string | null;
+};
+
+export type SubscriberAvatar = {
+  user_id: string;
+  full_name: string | null;
+  avatar_url: string | null;
 };
 
 export function ActivityDetailDrawer({
-  activity,
-  open,
-  onOpenChange,
-  onDelete,
-  onRsvp,
-  myRsvp,
+  activity, open, onOpenChange,
+  onDelete, onRsvp, myRsvp,
+  isOwner, isSubscribed, subscribers,
+  onSubscribe, onUnsubscribe, onToggleShare,
 }: {
   activity: DrawerActivity | null;
   open: boolean;
@@ -34,9 +40,17 @@ export function ActivityDetailDrawer({
   onDelete?: (id: string) => void;
   onRsvp?: (id: string, status: "going" | "maybe") => void;
   myRsvp?: "going" | "maybe" | "declined" | null;
+  isOwner?: boolean;
+  isSubscribed?: boolean;
+  subscribers?: SubscriberAvatar[];
+  onSubscribe?: (id: string) => void;
+  onUnsubscribe?: (id: string) => void;
+  onToggleShare?: (id: string, scope: "personal" | "shared") => void;
 }) {
   if (!activity) return null;
   const a = activity;
+  const subs = subscribers ?? [];
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-md">
@@ -48,6 +62,8 @@ export function ActivityDetailDrawer({
         <SheetHeader>
           <div className="flex items-center gap-2">
             {a.is_host_event && <Badge className="bg-primary text-primary-foreground"><Crown className="mr-1 h-3 w-3" />Hosted</Badge>}
+            {a.scope === "shared" && <Badge variant="secondary"><Users className="mr-1 h-3 w-3" />Shared</Badge>}
+            {a.scope === "personal" && isOwner && <Badge variant="outline"><Lock className="mr-1 h-3 w-3" />Just you</Badge>}
           </div>
           <SheetTitle className="font-display text-2xl leading-tight">{a.title}</SheetTitle>
         </SheetHeader>
@@ -83,14 +99,54 @@ export function ActivityDetailDrawer({
             )}
           </div>
 
-          {onRsvp && (
+          {/* Crew subscribers */}
+          {subs.length > 0 && (
+            <div className="rounded-2xl border bg-card p-3">
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground">In the crew · {subs.length}</p>
+              <div className="mt-2 flex flex-wrap gap-1">
+                {subs.map((s) => (
+                  <div key={s.user_id} title={s.full_name ?? ""} className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full border bg-background text-[11px] font-medium">
+                    {s.avatar_url ? <img src={s.avatar_url} alt="" className="h-full w-full object-cover" /> : (s.full_name?.[0] ?? "?")}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Owner: share toggle */}
+          {isOwner && onToggleShare && a.scope !== "core" && (
+            <div className="flex items-center justify-between rounded-2xl border bg-card p-3 text-xs">
+              <div>
+                <p className="font-medium">{a.scope === "shared" ? "Visible to crew" : "Private to you"}</p>
+                <p className="text-muted-foreground">{a.scope === "shared" ? "Crew members can subscribe." : "Share so others can join."}</p>
+              </div>
+              <Button size="sm" variant={a.scope === "shared" ? "outline" : "default"} className="rounded-full"
+                onClick={() => onToggleShare(a.id, a.scope === "shared" ? "personal" : "shared")}
+              >
+                {a.scope === "shared" ? "Make private" : "Share with crew"}
+              </Button>
+            </div>
+          )}
+
+          {/* Non-owner: subscribe */}
+          {!isOwner && onSubscribe && a.scope === "shared" && (
+            <Button
+              className="h-11 w-full rounded-xl"
+              variant={isSubscribed ? "outline" : "default"}
+              onClick={() => isSubscribed && onUnsubscribe ? onUnsubscribe(a.id) : onSubscribe(a.id)}
+            >
+              {isSubscribed ? (<><UserMinus className="mr-1 h-4 w-4" />Leave activity</>) : (<><UserPlus className="mr-1 h-4 w-4" />I'm in — add to my plan</>)}
+            </Button>
+          )}
+
+          {onRsvp && a.is_host_event && (
             <div className="flex gap-2 pt-3">
               <Button size="sm" className="flex-1 rounded-full" variant={myRsvp === "going" ? "default" : "outline"} onClick={() => onRsvp(a.id, "going")}>I'm in</Button>
               <Button size="sm" className="flex-1 rounded-full" variant={myRsvp === "maybe" ? "secondary" : "ghost"} onClick={() => onRsvp(a.id, "maybe")}>Maybe</Button>
             </div>
           )}
 
-          {onDelete && (
+          {onDelete && isOwner && (
             <button onClick={() => { onDelete(a.id); onOpenChange(false); }} className="mt-4 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive">
               <Trash2 className="h-3 w-3" /> Remove from trip
             </button>
