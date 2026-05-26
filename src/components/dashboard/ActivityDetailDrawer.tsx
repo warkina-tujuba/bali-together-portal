@@ -18,8 +18,8 @@ export type DrawerActivity = {
   is_host_event: boolean;
   lat: number | null;
   lng: number | null;
-  scope: "core" | "personal" | "shared" | null;
-  owner_user_id: string | null;
+  scope?: "core" | "personal" | "shared" | null;
+  owner_user_id?: string | null;
 };
 
 export type SubscriberAvatar = {
