@@ -3,12 +3,31 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { getDashboard, getItinerary, updateMyLocation, stopSharingLocation, listLiveLocations } from "@/lib/trip.functions";
+import { computeLeg } from "@/lib/routing.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { Switch } from "@/components/ui/switch";
 import { MapPin, Radio } from "lucide-react";
 import { GoogleMap, type GMapPin, type GMapAvatar } from "@/components/maps/GoogleMap";
 import { CrewLayerToggle, type CrewLayer } from "@/components/plan/CrewLayerToggle";
 import { cn } from "@/lib/utils";
+
+// Decode Google's encoded polyline format into [lng, lat] pairs
+function decodePolyline(encoded: string): [number, number][] {
+  const points: [number, number][] = [];
+  let index = 0, lat = 0, lng = 0;
+  while (index < encoded.length) {
+    let b: number, shift = 0, result = 0;
+    do { b = encoded.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+    const dlat = (result & 1) ? ~(result >> 1) : (result >> 1);
+    lat += dlat;
+    shift = 0; result = 0;
+    do { b = encoded.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+    const dlng = (result & 1) ? ~(result >> 1) : (result >> 1);
+    lng += dlng;
+    points.push([lng / 1e5, lat / 1e5]);
+  }
+  return points;
+}
 
 export const Route = createFileRoute("/_authenticated/map")({ component: MapPage });
 
