@@ -75,6 +75,13 @@ function PlanSearch() {
 
   const canSearch = !!to && !!draft.start_date && (mode === "one-way" || !!draft.end_date);
 
+  const calendarPhase = useMemo(() => {
+    if (mode === "one-way") return "Select your travel date";
+    if (!draft.start_date) return "Select your departure date";
+    if (!draft.end_date) return "Select your return date";
+    return `${format(parseISO(draft.start_date + "T00:00:00"), "MMM d")} → ${format(parseISO(draft.end_date + "T00:00:00"), "MMM d")}`;
+  }, [mode, draft.start_date, draft.end_date]);
+
   const onSearch = async () => {
     if (!canSearch || !to) return;
     draft.patch({
