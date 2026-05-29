@@ -1,608 +1,331 @@
 import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { useState, useMemo, useEffect } from "react";
-import { useServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { format, differenceInCalendarDays, addDays } from "date-fns";
-import {
-  MapPin, CalendarIcon, Sparkles, Plane, Home as HomeIcon, Compass,
-  Check, X, Plus, Trash2,
-} from "lucide-react";
+import { format, differenceInCalendarDays } from "date-fns";
+import { MapPin, CalendarIcon, Minus, Plus, Search, Info } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Slider } from "@/components/ui/slider";
-import { Card } from "@/components/ui/card";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
 import { PlaceAutocomplete, type PlaceHit } from "@/components/trip/PlaceAutocomplete";
-import { WizardShell, type WizardStep } from "@/components/plan/WizardShell";
-import { usePlanDraft, type PlanRadarPlace, type PlanStay } from "@/lib/plan-draft";
-import { lookupFlight } from "@/lib/trip.functions";
+import { usePlanDraft } from "@/lib/plan-draft";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 
 const searchSchema = z.object({ invite: z.string().optional() });
 
 export const Route = createFileRoute("/plan")({
   validateSearch: searchSchema,
-  component: PlanWizard,
+  component: PlanSearch,
   head: () => ({
     meta: [
-      { title: "Plan your trip — Travel Link" },
-      { name: "description", content: "Start planning your trip — destination, dates, stays, and your crew, all in one place." },
+      { title: "Trip search — Travel Link" },
+      { name: "description", content: "Search your next trip — destination, dates, and travellers." },
     ],
   }),
 });
 
-const STEPS: WizardStep[] = [
-  { key: "trip", label: "Trip" },
-  { key: "places", label: "Places" },
-  { key: "stays", label: "Stays" },
-  { key: "arrival", label: "Arrival" },
-  { key: "vibe", label: "Vibe" },
-];
+type TripMode = "return" | "one-way";
 
-function PlanWizard() {
+function PlanSearch() {
   const { invite } = useSearch({ from: "/plan" });
   const navigate = useNavigate();
   const draft = usePlanDraft();
-  const [step, setStep] = useState(0);
 
-  // Invite path: send straight to /plan/auth which after sign-in lands on /dashboard.
   useEffect(() => {
-    if (invite) {
-      navigate({ to: "/plan/auth", search: { invite, next: "/dashboard" } });
-    }
+    if (invite) navigate({ to: "/plan/auth", search: { invite, next: "/dashboard" } });
   }, [invite, navigate]);
 
-  const go = (n: number) => setStep(Math.max(0, Math.min(STEPS.length - 1, n)));
-
-  const finishToAuth = async () => {
-    const { data } = await supabase.auth.getUser();
-    if (data.user) {
-      navigate({ to: "/plan/profile" });
-    } else {
-      navigate({ to: "/plan/auth", search: { next: "/plan/profile" } });
-    }
-  };
-
-  // Per-step gates
-  const next = () => {
-    if (step === STEPS.length - 1) return finishToAuth();
-    go(step + 1);
-  };
-  const back = step > 0 ? () => go(step - 1) : undefined;
-  const skip = step >= 1 ? () => (step === STEPS.length - 1 ? finishToAuth() : go(step + 1)) : undefined;
-
-  const tripReady = !!draft.destination && !!((draft.start_date && draft.end_date) || draft.duration_days);
-
-  const stepProps = (() => {
-    switch (step) {
-      case 0:
-        return {
-          eyebrow: "Step 1 · Your trip",
-          title: "Let's plan your trip",
-          subtitle: "Where are you going, and when?",
-          icon: <MapPin className="h-4 w-4" />,
-          nextDisabled: !tripReady,
-        };
-      case 1:
-        return {
-          eyebrow: "Step 2 · On your radar",
-          title: "Any places you want to visit?",
-          subtitle: "Towns, neighbourhoods, beaches — add as many as you like.",
-          icon: <Compass className="h-4 w-4" />,
-          skippable: true,
-          nextDisabled: false,
-        };
-      case 2:
-        return {
-          eyebrow: "Step 3 · Stays",
-          title: "Where are you staying?",
-          subtitle: "Add booked stays — we'll pin them on the map for your crew.",
-          icon: <HomeIcon className="h-4 w-4" />,
-          skippable: true,
-          nextDisabled: false,
-        };
-      case 3:
-        return {
-          eyebrow: "Step 4 · Arrival",
-          title: "How are you arriving?",
-          subtitle: "Optional — share a flight so your crew knows when you land.",
-          icon: <Plane className="h-4 w-4" />,
-          skippable: true,
-          nextDisabled: false,
-        };
-      case 4:
-        return {
-          eyebrow: "Step 5 · Vibe",
-          title: "What's the vibe?",
-          subtitle: "Help us tailor your recommendations. Totally optional.",
-          icon: <Sparkles className="h-4 w-4" />,
-          skippable: true,
-          nextDisabled: false,
-        };
-      default:
-        return { eyebrow: "", title: "", nextDisabled: false };
-    }
-  })();
-
-  return (
-    <WizardShell
-      steps={STEPS}
-      currentIndex={step}
-      onBack={back}
-      onNext={next}
-      onSkip={skip}
-      nextLabel={step === STEPS.length - 1 ? "Save your trip" : "Next"}
-      {...stepProps}
-    >
-      {step === 0 && <TripSearchStep />}
-      {step === 1 && <RadarStep />}
-      {step === 2 && <StaysStep />}
-      {step === 3 && <ArrivalStep />}
-      {step === 4 && <VibeStep />}
-    </WizardShell>
+  const [mode, setMode] = useState<TripMode>("return");
+  const [from, setFrom] = useState<PlaceHit | null>(null);
+  const [to, setTo] = useState<PlaceHit | null>(
+    draft.destination
+      ? {
+          name: draft.destination.name,
+          address: draft.destination.address ?? "",
+          lat: draft.destination.lat ?? 0,
+          lng: draft.destination.lng ?? 0,
+          place_id: draft.destination.place_id ?? undefined,
+        }
+      : null,
   );
-}
-
-
-/* ---------- Steps ---------- */
-
-function TripSearchStep() {
-  const draft = usePlanDraft();
-  const [picked, setPicked] = useState<PlaceHit | null>(
-    draft.destination ? {
-      name: draft.destination.name,
-      address: draft.destination.address ?? "",
-      lat: draft.destination.lat ?? 0,
-      lng: draft.destination.lng ?? 0,
-      place_id: draft.destination.place_id ?? undefined,
-    } : null,
-  );
-
-  const [mode, setMode] = useState<"dates" | "duration">(
-    draft.duration_days && !draft.start_date ? "duration" : "dates",
-  );
-  type Pane = "where" | "when" | null;
-  const [openPane, setOpenPane] = useState<Pane>(picked ? "when" : "where");
-
-  useEffect(() => {
-    if (picked) {
-      draft.set("destination", {
-        name: picked.name,
-        address: picked.address,
-        lat: picked.lat,
-        lng: picked.lng,
-        place_id: picked.place_id,
-      });
-    } else {
-      draft.set("destination", null);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [picked]);
+  const [adults, setAdults] = useState(1);
+  const [children, setChildren] = useState(0);
+  const [infants, setInfants] = useState(0);
 
   const range: DateRange | undefined = draft.start_date
     ? { from: new Date(draft.start_date), to: draft.end_date ? new Date(draft.end_date) : undefined }
     : undefined;
 
-  const nights = useMemo(
-    () => (draft.start_date && draft.end_date
-      ? Math.max(0, differenceInCalendarDays(new Date(draft.end_date), new Date(draft.start_date)))
-      : 0),
-    [draft.start_date, draft.end_date],
-  );
+  const dateLabel = useMemo(() => {
+    if (!draft.start_date) return "When?";
+    const start = format(new Date(draft.start_date), "MMM d");
+    if (mode === "one-way" || !draft.end_date) return start;
+    return `${start} → ${format(new Date(draft.end_date), "MMM d")}`;
+  }, [draft.start_date, draft.end_date, mode]);
 
-  const dateLabel = draft.start_date && draft.end_date
-    ? `${format(new Date(draft.start_date), "MMM d")} → ${format(new Date(draft.end_date), "MMM d")}`
-    : draft.duration_days
-      ? `${draft.duration_days} days · flexible`
-      : "Add dates";
+  const canSearch = !!to && !!draft.start_date && (mode === "one-way" || !!draft.end_date);
+
+  const onSearch = async () => {
+    if (!canSearch || !to) return;
+    draft.patch({
+      destination: {
+        name: to.name,
+        address: to.address,
+        lat: to.lat,
+        lng: to.lng,
+        place_id: to.place_id,
+      },
+    });
+    const { data } = await supabase.auth.getUser();
+    if (data.user) navigate({ to: "/plan/profile" });
+    else navigate({ to: "/plan/auth", search: { next: "/plan/profile" } });
+  };
 
   return (
-    <div className="space-y-3">
-      {/* Booking-style search bar */}
-      <div className="overflow-hidden rounded-3xl border bg-card shadow-card">
-        <div className="grid grid-cols-1 divide-y sm:grid-cols-2 sm:divide-x sm:divide-y-0">
-          {/* WHERE */}
-          <button
-            type="button"
-            onClick={() => setOpenPane(openPane === "where" ? null : "where")}
-            className={cn(
-              "flex items-start gap-3 p-4 text-left transition",
-              openPane === "where" ? "bg-secondary/40" : "hover:bg-secondary/30",
-            )}
-          >
-            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
-              <MapPin className="h-4 w-4" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Where</div>
-              <div className={cn("truncate font-display text-lg leading-tight", !picked && "text-muted-foreground")}>
-                {picked?.name ?? "Pick a destination"}
-              </div>
-              {picked?.address && picked.address !== picked.name && (
-                <div className="truncate text-xs text-muted-foreground">{picked.address}</div>
-              )}
-            </div>
-          </button>
+    <div className="min-h-screen bg-secondary/30 pb-10">
+      {/* Orange header */}
+      <div className="bg-primary px-5 pb-10 pt-12 text-primary-foreground">
+        <h1 className="text-center font-display text-2xl font-semibold">Trip search</h1>
+      </div>
 
-          {/* WHEN */}
-          <button
-            type="button"
-            onClick={() => setOpenPane(openPane === "when" ? null : "when")}
-            className={cn(
-              "flex items-start gap-3 p-4 text-left transition",
-              openPane === "when" ? "bg-secondary/40" : "hover:bg-secondary/30",
-            )}
-          >
-            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
-              <CalendarIcon className="h-4 w-4" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">When</div>
-              <div className={cn("truncate font-display text-lg leading-tight", dateLabel === "Add dates" && "text-muted-foreground")}>
-                {dateLabel}
-              </div>
-              {draft.start_date && draft.end_date && (
-                <div className="text-xs text-muted-foreground">{nights} {nights === 1 ? "night" : "nights"}</div>
-              )}
-            </div>
-          </button>
-        </div>
+      <div className="-mt-6 px-4">
+        <div className="mx-auto max-w-md space-y-5 rounded-3xl bg-card p-5 shadow-card">
+          {/* Return / One way toggle */}
+          <div className="grid grid-cols-2 gap-1 rounded-full bg-secondary/60 p-1">
+            {(["return", "one-way"] as TripMode[]).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => {
+                  setMode(m);
+                  if (m === "one-way") draft.patch({ end_date: null, duration_days: null });
+                }}
+                className={cn(
+                  "rounded-full px-4 py-2.5 text-sm font-semibold transition",
+                  mode === m ? "bg-foreground text-background" : "text-muted-foreground",
+                )}
+              >
+                {m === "return" ? "Return" : "One way"}
+              </button>
+            ))}
+          </div>
 
-        {/* Expanded pane */}
-        {openPane === "where" && (
-          <div className="border-t bg-background p-4">
-            <PlaceAutocomplete
-              value={picked}
-              onPick={(p) => { setPicked(p); if (p) setOpenPane("when"); }}
-              autoFocus
-              placeholder="City, country, region…"
+          {/* From */}
+          <FieldCard label="From" placeholder="Where from?" value={from?.name ?? ""}>
+            <PlaceAutocomplete value={from} onPick={setFrom} placeholder="City or airport" autoFocus />
+          </FieldCard>
+
+          {/* To */}
+          <FieldCard label="To" placeholder="Where to?" value={to?.name ?? ""}>
+            <PlaceAutocomplete value={to} onPick={setTo} placeholder="City, region or country" autoFocus />
+          </FieldCard>
+
+          {/* Date */}
+          <Sheet>
+            <SheetTrigger asChild>
+              <button
+                type="button"
+                className="flex w-full items-center justify-between rounded-2xl border bg-card p-4 text-left transition hover:bg-secondary/40"
+              >
+                <div className="min-w-0">
+                  <div className="text-sm font-bold text-foreground">Date</div>
+                  <div className={cn("truncate text-base", !draft.start_date && "text-muted-foreground")}>
+                    {dateLabel}
+                  </div>
+                </div>
+                <CalendarIcon className="h-5 w-5 shrink-0 text-foreground" />
+              </button>
+            </SheetTrigger>
+            <SheetContent side="bottom" className="rounded-t-3xl">
+              <SheetHeader>
+                <SheetTitle>Choose your {mode === "return" ? "travel dates" : "departure date"}</SheetTitle>
+              </SheetHeader>
+              <div className="mt-4 overflow-x-auto">
+                {mode === "return" ? (
+                  <Calendar
+                    mode="range"
+                    numberOfMonths={1}
+                    selected={range}
+                    onSelect={(r) => {
+                      draft.patch({
+                        start_date: r?.from ? format(r.from, "yyyy-MM-dd") : null,
+                        end_date: r?.to ? format(r.to, "yyyy-MM-dd") : null,
+                        duration_days:
+                          r?.from && r?.to ? differenceInCalendarDays(r.to, r.from) + 1 : null,
+                        dates_flexible: false,
+                      });
+                    }}
+                    disabled={(d) => d < new Date(new Date().setHours(0, 0, 0, 0))}
+                    initialFocus
+                    className="pointer-events-auto mx-auto"
+                  />
+                ) : (
+                  <Calendar
+                    mode="single"
+                    numberOfMonths={1}
+                    selected={range?.from}
+                    onSelect={(d) => {
+                      draft.patch({
+                        start_date: d ? format(d, "yyyy-MM-dd") : null,
+                        end_date: null,
+                        duration_days: null,
+                        dates_flexible: false,
+                      });
+                    }}
+                    disabled={(d) => d < new Date(new Date().setHours(0, 0, 0, 0))}
+                    initialFocus
+                    className="pointer-events-auto mx-auto"
+                  />
+                )}
+              </div>
+
+            </SheetContent>
+          </Sheet>
+
+          {/* Travellers */}
+          <div className="space-y-1 pt-2">
+            <CounterRow
+              label="Adults"
+              value={adults}
+              onChange={(v) => setAdults(Math.max(1, v))}
+              min={1}
+            />
+            <CounterRow
+              label="Children"
+              meta="Ages 2–11"
+              note="Children travelling alone"
+              value={children}
+              onChange={(v) => setChildren(Math.max(0, v))}
+            />
+            <CounterRow
+              label="Infants"
+              meta="Under 2 years"
+              note="Travelling with infants"
+              value={infants}
+              onChange={(v) => setInfants(Math.max(0, v))}
             />
           </div>
-        )}
 
-        {openPane === "when" && (
-          <div className="space-y-4 border-t bg-background p-4">
-            <div className="grid grid-cols-2 gap-1 rounded-2xl bg-secondary p-1">
-              {(["dates", "duration"] as const).map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setMode(m)}
-                  className={cn(
-                    "rounded-xl px-4 py-2 text-sm font-medium transition",
-                    mode === m ? "bg-background shadow-soft" : "text-muted-foreground",
-                  )}
-                >
-                  {m === "dates" ? "Pick dates" : "Just duration"}
-                </button>
-              ))}
-            </div>
-
-            {mode === "dates" ? (
-              <div className="overflow-x-auto rounded-2xl border bg-card p-2">
-                <Calendar
-                  mode="range"
-                  numberOfMonths={2}
-                  selected={range}
-                  onSelect={(r) => {
-                    draft.patch({
-                      start_date: r?.from ? format(r.from, "yyyy-MM-dd") : null,
-                      end_date: r?.to ? format(r.to, "yyyy-MM-dd") : null,
-                      duration_days: r?.from && r?.to ? differenceInCalendarDays(r.to, r.from) + 1 : null,
-                      dates_flexible: false,
-                    });
-                  }}
-                  disabled={(d) => d < new Date(new Date().setHours(0, 0, 0, 0))}
-                  initialFocus
-                  className="pointer-events-auto mx-auto"
-                  classNames={{
-                    months: "flex flex-col sm:flex-row gap-4",
-                    month: "space-y-4",
-                  }}
-                />
-              </div>
-            ) : (
-              <>
-                <div className="grid grid-cols-3 gap-2">
-                  {[3, 5, 7, 10, 14, 21].map((n) => (
-                    <button
-                      key={n}
-                      onClick={() => draft.patch({
-                        duration_days: n,
-                        start_date: null,
-                        end_date: null,
-                        dates_flexible: true,
-                      })}
-                      className={cn(
-                        "rounded-2xl border-2 p-4 text-center transition",
-                        draft.duration_days === n
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:border-primary/40",
-                      )}
-                    >
-                      <div className="font-display text-3xl">{n}</div>
-                      <div className="text-xs text-muted-foreground">days</div>
-                    </button>
-                  ))}
-                </div>
-                <Input
-                  type="number"
-                  min={1}
-                  max={60}
-                  placeholder="Custom (1–60 days)"
-                  value={draft.duration_days && ![3, 5, 7, 10, 14, 21].includes(draft.duration_days) ? draft.duration_days : ""}
-                  onChange={(e) => {
-                    const v = parseInt(e.target.value, 10);
-                    draft.patch({
-                      duration_days: Number.isFinite(v) && v > 0 ? Math.min(60, v) : null,
-                      start_date: null,
-                      end_date: null,
-                      dates_flexible: true,
-                    });
-                  }}
-                  className="h-12 rounded-xl"
-                />
-              </>
-            )}
-          </div>
-        )}
-      </div>
-
-      {picked && ((draft.start_date && draft.end_date) || draft.duration_days) && (
-        <Card className="flex items-center gap-3 rounded-2xl border-0 bg-primary/5 p-4 shadow-soft">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/15 text-primary">
-            <Check className="h-5 w-5" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="font-display text-lg leading-tight">{picked.name}</p>
-            <p className="truncate text-xs text-muted-foreground">{dateLabel}</p>
-          </div>
-        </Card>
-      )}
-    </div>
-  );
-}
-
-
-function RadarStep() {
-  const draft = usePlanDraft();
-  const [picked, setPicked] = useState<PlaceHit | null>(null);
-
-  const add = () => {
-    if (!picked) return;
-    const next: PlanRadarPlace = {
-      name: picked.name,
-      address: picked.address,
-      place_id: picked.place_id,
-      lat: picked.lat,
-      lng: picked.lng,
-    };
-    draft.set("places", [...draft.places, next]);
-    setPicked(null);
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex gap-2">
-        <div className="flex-1">
-          <PlaceAutocomplete value={picked} onPick={setPicked} placeholder="Add a place, town, neighbourhood…" />
-        </div>
-        <Button onClick={add} disabled={!picked} className="h-14 rounded-2xl px-5">
-          <Plus className="h-5 w-5" />
-        </Button>
-      </div>
-
-      {draft.places.length === 0 && (
-        <p className="rounded-xl bg-secondary/50 p-4 text-center text-sm text-muted-foreground">
-          Nothing on the radar yet. Add as many spots as you want — they'll seed your day-by-day plan.
-        </p>
-      )}
-
-      <div className="space-y-2">
-        {draft.places.map((p, i) => (
-          <Card key={`${p.name}-${i}`} className="flex items-start gap-3 rounded-2xl border-0 bg-secondary/40 p-3 shadow-soft">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
-              <MapPin className="h-4 w-4" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-medium">{p.name}</p>
-              {p.address && p.address !== p.name && (
-                <p className="truncate text-xs text-muted-foreground">{p.address}</p>
-              )}
-            </div>
-            <button
-              onClick={() => draft.set("places", draft.places.filter((_, j) => j !== i))}
-              className="rounded-full p-1.5 text-muted-foreground hover:bg-background"
-              aria-label="Remove"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function StaysStep() {
-  const draft = usePlanDraft();
-  const [picked, setPicked] = useState<PlaceHit | null>(null);
-
-  const add = () => {
-    if (!picked) return;
-    const next: PlanStay = {
-      name: picked.name,
-      address: picked.address,
-      place_id: picked.place_id,
-      lat: picked.lat,
-      lng: picked.lng,
-    };
-    draft.set("stays", [...draft.stays, next]);
-    setPicked(null);
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex gap-2">
-        <div className="flex-1">
-          <PlaceAutocomplete value={picked} onPick={setPicked} placeholder="Hotel, villa, Airbnb address…" />
-        </div>
-        <Button onClick={add} disabled={!picked} className="h-14 rounded-2xl px-5">
-          <Plus className="h-5 w-5" />
-        </Button>
-      </div>
-
-      {draft.stays.length === 0 && (
-        <p className="rounded-xl bg-secondary/50 p-4 text-center text-sm text-muted-foreground">
-          No stays yet. Skip and add later from your dashboard if you haven't booked.
-        </p>
-      )}
-
-      <div className="space-y-2">
-        {draft.stays.map((s, i) => (
-          <Card key={`${s.name}-${i}`} className="flex items-start gap-3 rounded-2xl border-0 bg-secondary/40 p-3 shadow-soft">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
-              <HomeIcon className="h-4 w-4" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-medium">{s.name}</p>
-              {s.address && <p className="truncate text-xs text-muted-foreground">{s.address}</p>}
-            </div>
-            <button
-              onClick={() => draft.set("stays", draft.stays.filter((_, j) => j !== i))}
-              className="rounded-full p-1.5 text-muted-foreground hover:bg-background"
-              aria-label="Remove"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ArrivalStep() {
-  const draft = usePlanDraft();
-  const lookupFn = useServerFn(lookupFlight);
-  const [flightNum, setFlightNum] = useState(draft.arrival?.flight_number ?? "");
-  const [date, setDate] = useState(draft.arrival?.scheduled_at?.slice(0, 10) ?? draft.start_date ?? "");
-  const [busy, setBusy] = useState(false);
-
-  const lookup = async () => {
-    if (!flightNum) return;
-    setBusy(true);
-    try {
-      const r = await lookupFn({ data: { flight_number: flightNum, date: date || null } });
-      if (!r.found) {
-        toast.error("Flight not found — save manually below");
-        draft.set("arrival", { ...draft.arrival, flight_number: flightNum, scheduled_at: date ? `${date}T00:00:00Z` : null });
-        return;
-      }
-      draft.set("arrival", {
-        flight_number: r.flight_number,
-        airline: r.airline,
-        airline_iata: r.airline_iata,
-        scheduled_at: r.scheduled_at,
-        origin_iata: r.origin_iata,
-        origin_city: r.origin_city,
-        destination_iata: r.destination_iata,
-        destination_city: r.destination_city,
-      });
-      toast.success(`${r.airline ?? "Flight"} ${r.flight_number} added`);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Lookup failed");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const clear = () => {
-    draft.set("arrival", null);
-    setFlightNum("");
-  };
-
-  return (
-    <div className="space-y-4">
-      <Card className="rounded-3xl border-0 bg-card p-5 shadow-card">
-        <div className="grid gap-3 sm:grid-cols-[1fr,auto]">
-          <Input
-            placeholder="Flight number (e.g. QF63)"
-            value={flightNum}
-            onChange={(e) => setFlightNum(e.target.value.toUpperCase())}
-            className="h-12 rounded-xl"
-          />
-          <Input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="h-12 rounded-xl"
-          />
-        </div>
-        <div className="mt-3 flex gap-2">
-          <Button onClick={lookup} disabled={!flightNum || busy} className="flex-1 rounded-xl">
-            {busy ? "Looking up…" : "Find flight"}
+          {/* Search */}
+          <Button
+            onClick={onSearch}
+            disabled={!canSearch}
+            className="h-14 w-full rounded-full text-base font-semibold shadow-card disabled:opacity-50"
+          >
+            <Search className="mr-2 h-5 w-5" />
+            Search
           </Button>
-          {draft.arrival && (
-            <Button variant="ghost" onClick={clear} className="rounded-xl">Clear</Button>
-          )}
         </div>
-        {draft.arrival && (
-          <div className="mt-4 rounded-2xl bg-secondary/50 p-3 text-sm">
-            <div className="font-medium">{draft.arrival.airline} {draft.arrival.flight_number}</div>
-            <div className="text-xs text-muted-foreground">
-              {draft.arrival.origin_iata ?? "—"} → {draft.arrival.destination_iata ?? "—"}
-              {draft.arrival.scheduled_at && ` · ${format(new Date(draft.arrival.scheduled_at), "MMM d, p")}`}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Small bits ---------- */
+
+function FieldCard({
+  label,
+  value,
+  placeholder,
+  children,
+}: {
+  label: string;
+  value: string;
+  placeholder: string;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <button
+          type="button"
+          className="flex w-full items-center justify-between rounded-2xl border bg-card p-4 text-left transition hover:bg-secondary/40"
+        >
+          <div className="min-w-0">
+            <div className="text-sm font-bold text-foreground">{label}</div>
+            <div className={cn("truncate text-base", !value && "text-muted-foreground")}>
+              {value || placeholder}
             </div>
           </div>
-        )}
-      </Card>
-      <p className="text-center text-xs text-muted-foreground">
-        Don't have flights yet? Skip — add them anytime from your dashboard.
-      </p>
-    </div>
-  );
-}
-
-function VibeStep() {
-  const draft = usePlanDraft();
-  const v = draft.vibe ?? { adventure: 50, culture: 50, budget: 50, foodie: 50, pace: 50 };
-  const update = (patch: Partial<typeof v>) => draft.set("vibe", { ...v, ...patch });
-
-  const rows = [
-    { key: "adventure", left: "Relax", right: "Adventure" },
-    { key: "culture", left: "Party", right: "Culture" },
-    { key: "budget", left: "Budget", right: "Luxury" },
-    { key: "foodie", left: "Light bites", right: "Foodie" },
-    { key: "pace", left: "Spontaneous", right: "Planned" },
-  ] as const;
-
-  return (
-    <div className="space-y-6">
-      {rows.map((r) => (
-        <div key={r.key}>
-          <div className="mb-2 flex items-center justify-between text-xs font-medium text-muted-foreground">
-            <span>{r.left}</span>
-            <span>{r.right}</span>
+          <MapPin className="h-5 w-5 shrink-0 text-foreground" />
+        </button>
+      </SheetTrigger>
+      <SheetContent side="bottom" className="rounded-t-3xl">
+        <SheetHeader>
+          <SheetTitle>{label}</SheetTitle>
+        </SheetHeader>
+        <div className="mt-4" onClick={(e) => {
+          // close after a selection bubbles up (PlaceAutocomplete sets value)
+          const tgt = e.target as HTMLElement;
+          if (tgt.closest("[data-place-pick]")) setOpen(false);
+        }}>
+          {children}
+          <div className="mt-4 flex justify-end">
+            <Button variant="ghost" onClick={() => setOpen(false)}>Done</Button>
           </div>
-          <Slider
-            value={[v[r.key]]}
-            onValueChange={([val]) => update({ [r.key]: val } as Partial<typeof v>)}
-            min={0}
-            max={100}
-            step={1}
-          />
         </div>
-      ))}
-      <p className="text-center text-xs text-muted-foreground">
-        Optional — helps us tailor recommendations. You can change this anytime.
-      </p>
-    </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 
-// Helper to avoid unused warnings in some builds
-export const _addDays = addDays;
+function CounterRow({
+  label,
+  meta,
+  note,
+  value,
+  min = 0,
+  onChange,
+}: {
+  label: string;
+  meta?: string;
+  note?: string;
+  value: number;
+  min?: number;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between border-b py-4 last:border-b-0">
+      <div className="min-w-0">
+        <div className="flex items-baseline gap-2">
+          <span className="font-display text-lg font-semibold">{label}</span>
+          {meta && <span className="text-sm text-muted-foreground">{meta}</span>}
+        </div>
+        {note && (
+          <div className="mt-0.5 flex items-center gap-1.5 text-sm text-muted-foreground">
+            <Info className="h-3.5 w-3.5 text-ocean" />
+            {note}
+          </div>
+        )}
+      </div>
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          aria-label={`Decrease ${label}`}
+          onClick={() => onChange(value - 1)}
+          disabled={value <= min}
+          className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground transition hover:bg-muted/80 disabled:opacity-40"
+        >
+          <Minus className="h-4 w-4" />
+        </button>
+        <span className="w-6 text-center text-lg font-semibold tabular-nums">{value}</span>
+        <button
+          type="button"
+          aria-label={`Increase ${label}`}
+          onClick={() => onChange(value + 1)}
+          className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground transition hover:opacity-90"
+        >
+          <Plus className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
