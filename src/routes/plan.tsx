@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { useState, useMemo, useEffect } from "react";
 import { z } from "zod";
-import { format, differenceInCalendarDays } from "date-fns";
+import { format, differenceInCalendarDays, parseISO } from "date-fns";
 import { MapPin, CalendarIcon, Minus, Plus, Search, Info } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 import { Calendar } from "@/components/ui/calendar";
@@ -59,18 +59,28 @@ function PlanSearch() {
   const [children, setChildren] = useState(0);
   const [infants, setInfants] = useState(0);
 
-  const range: DateRange | undefined = draft.start_date
-    ? { from: new Date(draft.start_date), to: draft.end_date ? new Date(draft.end_date) : undefined }
-    : undefined;
+  const range = useMemo<DateRange | undefined>(() => {
+    if (!draft.start_date) return undefined;
+    const from = parseISO(draft.start_date + "T00:00:00");
+    if (draft.end_date) return { from, to: parseISO(draft.end_date + "T00:00:00") };
+    return { from };
+  }, [draft.start_date, draft.end_date]);
 
   const dateLabel = useMemo(() => {
     if (!draft.start_date) return "When?";
-    const start = format(new Date(draft.start_date), "MMM d");
+    const start = format(parseISO(draft.start_date + "T00:00:00"), "MMM d");
     if (mode === "one-way" || !draft.end_date) return start;
-    return `${start} → ${format(new Date(draft.end_date), "MMM d")}`;
+    return `${start} → ${format(parseISO(draft.end_date + "T00:00:00"), "MMM d")}`;
   }, [draft.start_date, draft.end_date, mode]);
 
   const canSearch = !!to && !!draft.start_date && (mode === "one-way" || !!draft.end_date);
+
+  const calendarPhase = useMemo(() => {
+    if (mode === "one-way") return "Select your travel date";
+    if (!draft.start_date) return "Select your departure date";
+    if (!draft.end_date) return "Select your return date";
+    return `${format(parseISO(draft.start_date + "T00:00:00"), "MMM d")} → ${format(parseISO(draft.end_date + "T00:00:00"), "MMM d")}`;
+  }, [mode, draft.start_date, draft.end_date]);
 
   const onSearch = async () => {
     if (!canSearch || !to) return;
@@ -151,6 +161,7 @@ function PlanSearch() {
                 <SheetTitle className="font-display text-2xl md:text-3xl">
                   {mode === "return" ? "When are you travelling?" : "When are you flying?"}
                 </SheetTitle>
+                <p className="text-sm font-medium text-primary">{calendarPhase}</p>
               </SheetHeader>
               <div className="mt-6 flex justify-center">
                 {mode === "return" ? (
