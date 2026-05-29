@@ -148,13 +148,12 @@ function PlanSearch() {
                 <SheetTitle>Choose your {mode === "return" ? "travel dates" : "departure date"}</SheetTitle>
               </SheetHeader>
               <div className="mt-4 overflow-x-auto">
-                <Calendar
-                  mode={mode === "return" ? "range" : "single"}
-                  numberOfMonths={1}
-                  selected={mode === "return" ? range : range?.from}
-                  onSelect={(v: DateRange | Date | undefined) => {
-                    if (mode === "return") {
-                      const r = v as DateRange | undefined;
+                {mode === "return" ? (
+                  <Calendar
+                    mode="range"
+                    numberOfMonths={1}
+                    selected={range}
+                    onSelect={(r) => {
                       draft.patch({
                         start_date: r?.from ? format(r.from, "yyyy-MM-dd") : null,
                         end_date: r?.to ? format(r.to, "yyyy-MM-dd") : null,
@@ -162,21 +161,31 @@ function PlanSearch() {
                           r?.from && r?.to ? differenceInCalendarDays(r.to, r.from) + 1 : null,
                         dates_flexible: false,
                       });
-                    } else {
-                      const d = v as Date | undefined;
+                    }}
+                    disabled={(d) => d < new Date(new Date().setHours(0, 0, 0, 0))}
+                    initialFocus
+                    className="pointer-events-auto mx-auto"
+                  />
+                ) : (
+                  <Calendar
+                    mode="single"
+                    numberOfMonths={1}
+                    selected={range?.from}
+                    onSelect={(d) => {
                       draft.patch({
                         start_date: d ? format(d, "yyyy-MM-dd") : null,
                         end_date: null,
                         duration_days: null,
                         dates_flexible: false,
                       });
-                    }
-                  }}
-                  disabled={(d) => d < new Date(new Date().setHours(0, 0, 0, 0))}
-                  initialFocus
-                  className="pointer-events-auto mx-auto"
-                />
+                    }}
+                    disabled={(d) => d < new Date(new Date().setHours(0, 0, 0, 0))}
+                    initialFocus
+                    className="pointer-events-auto mx-auto"
+                  />
+                )}
               </div>
+
             </SheetContent>
           </Sheet>
 
