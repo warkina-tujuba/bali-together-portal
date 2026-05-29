@@ -116,7 +116,7 @@ function Dashboard() {
 
   const isAdmin = !!adminData?.admin;
 
-  const days = useMemo(() => data?.trip ? dateRange(data.trip.start_date, data.trip.end_date) : [], [data?.trip]);
+  const days = useMemo(() => data?.trip?.start_date && data.trip.end_date ? dateRange(data.trip.start_date, data.trip.end_date) : [], [data?.trip]);
   const activeDay = selectedDay ?? days[0];
 
 
@@ -283,7 +283,9 @@ function Dashboard() {
           <p className="text-xs uppercase tracking-widest text-muted-foreground">{trip.destination}</p>
           <h1 className="font-display text-3xl leading-tight sm:text-4xl">{trip.name}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {new Date(trip.start_date).toLocaleDateString(undefined, { month: "short", day: "numeric" })} – {new Date(trip.end_date).toLocaleDateString(undefined, { month: "short", day: "numeric" })} · {data.members.length} in the crew
+            {trip.start_date && trip.end_date
+              ? `${new Date(trip.start_date).toLocaleDateString(undefined, { month: "short", day: "numeric" })} – ${new Date(trip.end_date).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`
+              : "Dates TBD"} · {data.members.length} in the crew
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

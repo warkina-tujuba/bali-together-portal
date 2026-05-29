@@ -76,7 +76,7 @@ function DiscoverPage() {
   const { data: home } = useQuery({ queryKey: ["itineraryHome"], queryFn: () => homeFn() });
   const trip = home?.trip;
   const destination = trip?.destination?.split(",")[0]?.trim() || "Bali";
-  const days = useMemo(() => trip ? dateRange(trip.start_date, trip.end_date) : [], [trip]);
+  const days = useMemo(() => trip?.start_date && trip.end_date ? dateRange(trip.start_date, trip.end_date) : [], [trip]);
   const existingActivities = useMemo(
     () => (home?.activities ?? []).filter((a) => !a.parked).map((a) => ({ id: a.id, day_date: a.day_date!, start_time: a.start_time, end_time: a.end_time, title: a.title })),
     [home],
