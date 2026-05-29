@@ -68,8 +68,8 @@
   --card-foreground: var(--deep);
   --popover: oklch(1 0 0);
   --popover-foreground: var(--deep);
-  --primary: var(--coral);
-  --primary-foreground: oklch(0.99 0 0);
+  --primary: var(--ocean);
+  --primary-foreground: oklch(0.985 0.008 85);
   --secondary: var(--sand);
   --secondary-foreground: var(--deep);
   --muted: oklch(0.94 0.01 250);
