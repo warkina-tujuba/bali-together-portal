@@ -120,19 +120,43 @@ function Dashboard() {
   const activeDay = selectedDay ?? days[0];
 
 
+  const userId = data?.userId;
+
+  // Apply crew-layer filter + drop parked items from calendar
+  const visibleActivities = useMemo(() => {
+    const all = (data?.activities ?? []) as Activity[];
+    return all.filter((a) => {
+      if (a.parked) return false;
+      const mine = a.owner_user_id == null || a.owner_user_id === userId;
+      if (crewLayer === "mine") return mine;
+      if (crewLayer === "crew") return !mine;
+      return true;
+    });
+  }, [data?.activities, crewLayer, userId]);
+
+  const backlogItems = useMemo<BacklogItem[]>(() => {
+    return ((data?.activities ?? []) as Activity[])
+      .filter((a) => a.parked && (a.owner_user_id == null || a.owner_user_id === userId))
+      .map((a) => ({
+        id: a.id, day_date: a.day_date, start_time: a.start_time, end_time: a.end_time,
+        duration_min: a.duration_min ?? 60, title: a.title, location: a.location,
+        is_host_event: a.is_host_event, lat: a.lat, lng: a.lng,
+        image_url: a.image_url, cost_usd: a.cost_usd ?? null,
+      }));
+  }, [data?.activities, userId]);
+
   const activitiesByDay = useMemo(() => {
     const map = new Map<string, Activity[]>();
-    (data?.activities ?? []).forEach((a: Activity) => {
+    visibleActivities.forEach((a) => {
       if (!map.has(a.day_date)) map.set(a.day_date, []);
       map.get(a.day_date)!.push(a);
     });
-    // host events first then by start_time
     map.forEach((arr) => arr.sort((a, b) => {
       if (a.is_host_event !== b.is_host_event) return a.is_host_event ? -1 : 1;
       return (a.start_time ?? "99:99").localeCompare(b.start_time ?? "99:99");
     }));
     return map;
-  }, [data?.activities]);
+  }, [visibleActivities]);
 
   const rsvpsByActivity = useMemo(() => {
     const map = new Map<string, Rsvp[]>();
@@ -149,6 +173,52 @@ function Dashboard() {
     return m;
   }, [data?.members]);
 
+  // Compute travel legs for the active day (consecutive activities with coords)
+  const dayLegInputs = useMemo(() => {
+    const list = (activitiesByDay.get(activeDay) ?? []).filter((a) => a.lat != null && a.lng != null);
+    const pairs: { from: Activity; to: Activity }[] = [];
+    for (let i = 0; i < list.length - 1; i++) pairs.push({ from: list[i], to: list[i + 1] });
+    return pairs;
+  }, [activitiesByDay, activeDay]);
+
+  const { data: dayLegs } = useQuery({
+    queryKey: ["dayLegs", activeDay, dayLegInputs.map((p) => `${p.from.id}->${p.to.id}`).join("|")],
+    enabled: dayLegInputs.length > 0,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const out = await Promise.all(dayLegInputs.map(async (p) => {
+        const hr = parseInt((p.from.start_time ?? "12:00").slice(0, 2), 10) || 12;
+        try {
+          const r = await computeLegFn({ data: {
+            origin: { lat: p.from.lat!, lng: p.from.lng! },
+            dest: { lat: p.to.lat!, lng: p.to.lng! },
+            hour: hr,
+          } });
+          return { from_id: p.from.id, to_id: p.to.id, duration_min: r.duration_min, distance_km: Number(r.distance_km) };
+        } catch { return null; }
+      }));
+      return out.filter((x): x is TravelLeg => !!x);
+    },
+  });
+
+  const legsByDay = useMemo(() => {
+    const m = new Map<string, TravelLeg[]>();
+    if (dayLegs && dayLegs.length) m.set(activeDay, dayLegs);
+    return m;
+  }, [dayLegs, activeDay]);
+
+  // Build a route polyline for the active day (stay → activities → stay)
+  const routeCoords = useMemo<[number, number][]>(() => {
+    if (!data) return [];
+    const stay = data.stays.find((s) => s.lat != null && s.lng != null);
+    const dayActs = (activitiesByDay.get(activeDay) ?? []).filter((a) => a.lat != null && a.lng != null);
+    const coords: [number, number][] = [];
+    if (stay) coords.push([stay.lng!, stay.lat!]);
+    dayActs.forEach((a) => coords.push([a.lng!, a.lat!]));
+    if (stay && dayActs.length > 0) coords.push([stay.lng!, stay.lat!]);
+    return coords;
+  }, [data, activitiesByDay, activeDay]);
+
   const mapPins = useMemo(() => {
     if (!data) return [];
     const pins: { id: string; lat: number; lng: number; label: string; sub?: string; kind: "stay" | "activity" | "host" }[] = [];
@@ -162,6 +232,7 @@ function Dashboard() {
     });
     return pins;
   }, [data, activitiesByDay, activeDay]);
+
 
   async function handleRsvp(activityId: string, status: "going" | "maybe") {
     try {
