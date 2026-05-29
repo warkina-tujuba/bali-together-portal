@@ -8,7 +8,9 @@ import {
 } from "@/lib/trip.functions";
 import {
   optimiseDay, applyDaySchedule, createCustomActivity, updateActivitySchedule,
+  computeLeg,
 } from "@/lib/routing.functions";
+import { setActivityParked } from "@/lib/share.functions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -17,11 +19,13 @@ import {
   Crown, Users, MapPin, Sparkles, Plus,
   Copy, AlertCircle, Plane, Home as HomeIcon, MessageCircle,
 } from "lucide-react";
-import { SnapMap, type SnapPin, type SnapAvatar } from "@/components/dashboard/SnapMap";
-import { WeekCalendar, type CalActivity } from "@/components/dashboard/WeekCalendar";
+import { SnapMap, type SnapPin } from "@/components/dashboard/SnapMap";
+import { WeekCalendar, type CalActivity, type TravelLeg } from "@/components/dashboard/WeekCalendar";
 import { AddActivitySheet } from "@/components/dashboard/AddActivitySheet";
 import { ActivityDetailDrawer, type DrawerActivity } from "@/components/dashboard/ActivityDetailDrawer";
 import { OptimiseDialog } from "@/components/dashboard/OptimiseDialog";
+import { BacklogTray, type BacklogItem } from "@/components/plan/BacklogTray";
+import { CrewLayerToggle, type CrewLayer } from "@/components/plan/CrewLayerToggle";
 import { HostEventDialog } from "@/components/trip/HostEventDialog";
 import { FlightDialog } from "@/components/trip/FlightDialog";
 import { StayDialog } from "@/components/trip/StayDialog";
