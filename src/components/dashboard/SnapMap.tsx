@@ -106,6 +106,34 @@ export function SnapMap({
     });
   }, [avatars]);
 
+  // Route polyline for selected day
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const apply = () => {
+      const src = map.getSource("tl-route") as mapboxgl.GeoJSONSource | undefined;
+      const geojson = {
+        type: "Feature" as const,
+        properties: {},
+        geometry: { type: "LineString" as const, coordinates: routeCoords ?? [] },
+      };
+      if (src) {
+        src.setData(geojson as never);
+      } else {
+        map.addSource("tl-route", { type: "geojson", data: geojson as never });
+        map.addLayer({
+          id: "tl-route-line",
+          type: "line",
+          source: "tl-route",
+          layout: { "line-cap": "round", "line-join": "round" },
+          paint: { "line-color": "#D97757", "line-width": 4, "line-opacity": 0.85, "line-dasharray": [0.2, 1.4] },
+        });
+      }
+    };
+    if (map.isStyleLoaded()) apply();
+    else map.once("style.load", apply);
+  }, [routeCoords]);
+
   useEffect(() => {
     if (!focusedId) return;
     const marker = markersRef.current.get(focusedId);
