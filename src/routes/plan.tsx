@@ -150,7 +150,7 @@ function PlanWizard() {
 
 /* ---------- Steps ---------- */
 
-function DestinationStep() {
+function TripSearchStep() {
   const draft = usePlanDraft();
   const [picked, setPicked] = useState<PlaceHit | null>(
     draft.destination ? {
@@ -161,6 +161,13 @@ function DestinationStep() {
       place_id: draft.destination.place_id ?? undefined,
     } : null,
   );
+
+  const [mode, setMode] = useState<"dates" | "duration">(
+    draft.duration_days && !draft.start_date ? "duration" : "dates",
+  );
+  type Pane = "where" | "when" | null;
+  const [openPane, setOpenPane] = useState<Pane>(picked ? "when" : "where");
+
   useEffect(() => {
     if (picked) {
       draft.set("destination", {
@@ -176,32 +183,6 @@ function DestinationStep() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [picked]);
 
-  return (
-    <div className="space-y-3">
-      <PlaceAutocomplete value={picked} onPick={setPicked} autoFocus placeholder="City, country, region…" />
-      {picked && (
-        <Card className="flex items-center gap-3 rounded-2xl border-0 bg-primary/5 p-4 shadow-soft">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/15 text-primary">
-            <Check className="h-5 w-5" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="font-display text-lg leading-tight">{picked.name}</p>
-            {picked.address && picked.address !== picked.name && (
-              <p className="truncate text-xs text-muted-foreground">{picked.address}</p>
-            )}
-          </div>
-        </Card>
-      )}
-    </div>
-  );
-}
-
-function DatesStep() {
-  const draft = usePlanDraft();
-  const [mode, setMode] = useState<"dates" | "duration">(
-    draft.duration_days && !draft.start_date ? "duration" : "dates",
-  );
-
   const range: DateRange | undefined = draft.start_date
     ? { from: new Date(draft.start_date), to: draft.end_date ? new Date(draft.end_date) : undefined }
     : undefined;
@@ -213,104 +194,178 @@ function DatesStep() {
     [draft.start_date, draft.end_date],
   );
 
+  const dateLabel = draft.start_date && draft.end_date
+    ? `${format(new Date(draft.start_date), "MMM d")} → ${format(new Date(draft.end_date), "MMM d")}`
+    : draft.duration_days
+      ? `${draft.duration_days} days · flexible`
+      : "Add dates";
+
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-1 rounded-2xl bg-secondary p-1">
-        {(["dates", "duration"] as const).map((m) => (
+    <div className="space-y-3">
+      {/* Booking-style search bar */}
+      <div className="overflow-hidden rounded-3xl border bg-card shadow-card">
+        <div className="grid grid-cols-1 divide-y sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+          {/* WHERE */}
           <button
-            key={m}
-            onClick={() => setMode(m)}
+            type="button"
+            onClick={() => setOpenPane(openPane === "where" ? null : "where")}
             className={cn(
-              "rounded-xl px-4 py-2 text-sm font-medium capitalize transition",
-              mode === m ? "bg-background shadow-soft" : "text-muted-foreground",
+              "flex items-start gap-3 p-4 text-left transition",
+              openPane === "where" ? "bg-secondary/40" : "hover:bg-secondary/30",
             )}
           >
-            {m === "dates" ? "Pick dates" : "Just duration"}
+            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+              <MapPin className="h-4 w-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Where</div>
+              <div className={cn("truncate font-display text-lg leading-tight", !picked && "text-muted-foreground")}>
+                {picked?.name ?? "Pick a destination"}
+              </div>
+              {picked?.address && picked.address !== picked.name && (
+                <div className="truncate text-xs text-muted-foreground">{picked.address}</div>
+              )}
+            </div>
           </button>
-        ))}
-      </div>
 
-      {mode === "dates" ? (
-        <>
-          <div className="overflow-x-auto rounded-2xl border bg-card p-2">
-            <Calendar
-              mode="range"
-              numberOfMonths={2}
-              selected={range}
-              onSelect={(r) => {
-                draft.patch({
-                  start_date: r?.from ? format(r.from, "yyyy-MM-dd") : null,
-                  end_date: r?.to ? format(r.to, "yyyy-MM-dd") : null,
-                  duration_days: r?.from && r?.to ? differenceInCalendarDays(r.to, r.from) + 1 : null,
-                  dates_flexible: false,
-                });
-              }}
-              disabled={(d) => d < new Date(new Date().setHours(0, 0, 0, 0))}
-              initialFocus
-              className="pointer-events-auto mx-auto"
-              classNames={{
-                months: "flex flex-col sm:flex-row gap-4",
-                month: "space-y-4",
-              }}
+          {/* WHEN */}
+          <button
+            type="button"
+            onClick={() => setOpenPane(openPane === "when" ? null : "when")}
+            className={cn(
+              "flex items-start gap-3 p-4 text-left transition",
+              openPane === "when" ? "bg-secondary/40" : "hover:bg-secondary/30",
+            )}
+          >
+            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+              <CalendarIcon className="h-4 w-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">When</div>
+              <div className={cn("truncate font-display text-lg leading-tight", dateLabel === "Add dates" && "text-muted-foreground")}>
+                {dateLabel}
+              </div>
+              {draft.start_date && draft.end_date && (
+                <div className="text-xs text-muted-foreground">{nights} {nights === 1 ? "night" : "nights"}</div>
+              )}
+            </div>
+          </button>
+        </div>
+
+        {/* Expanded pane */}
+        {openPane === "where" && (
+          <div className="border-t bg-background p-4">
+            <PlaceAutocomplete
+              value={picked}
+              onPick={(p) => { setPicked(p); if (p) setOpenPane("when"); }}
+              autoFocus
+              placeholder="City, country, region…"
             />
           </div>
-          {draft.start_date && draft.end_date && (
-            <div className="flex justify-center">
-              <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-2 text-sm">
-                <strong>{format(new Date(draft.start_date), "MMM d")}</strong>
-                <span className="text-muted-foreground">→</span>
-                <strong>{format(new Date(draft.end_date), "MMM d, yyyy")}</strong>
-                <span className="text-muted-foreground">· {nights} {nights === 1 ? "night" : "nights"}</span>
-              </div>
+        )}
+
+        {openPane === "when" && (
+          <div className="space-y-4 border-t bg-background p-4">
+            <div className="grid grid-cols-2 gap-1 rounded-2xl bg-secondary p-1">
+              {(["dates", "duration"] as const).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setMode(m)}
+                  className={cn(
+                    "rounded-xl px-4 py-2 text-sm font-medium transition",
+                    mode === m ? "bg-background shadow-soft" : "text-muted-foreground",
+                  )}
+                >
+                  {m === "dates" ? "Pick dates" : "Just duration"}
+                </button>
+              ))}
             </div>
-          )}
-        </>
-      ) : (
-        <>
-          <div className="grid grid-cols-3 gap-2">
-            {[3, 5, 7, 10, 14, 21].map((n) => (
-              <button
-                key={n}
-                onClick={() => draft.patch({
-                  duration_days: n,
-                  start_date: null,
-                  end_date: null,
-                  dates_flexible: true,
-                })}
-                className={cn(
-                  "rounded-2xl border-2 p-4 text-center transition",
-                  draft.duration_days === n
-                    ? "border-primary bg-primary/5"
-                    : "border-border hover:border-primary/40",
-                )}
-              >
-                <div className="font-display text-3xl">{n}</div>
-                <div className="text-xs text-muted-foreground">days</div>
-              </button>
-            ))}
+
+            {mode === "dates" ? (
+              <div className="overflow-x-auto rounded-2xl border bg-card p-2">
+                <Calendar
+                  mode="range"
+                  numberOfMonths={2}
+                  selected={range}
+                  onSelect={(r) => {
+                    draft.patch({
+                      start_date: r?.from ? format(r.from, "yyyy-MM-dd") : null,
+                      end_date: r?.to ? format(r.to, "yyyy-MM-dd") : null,
+                      duration_days: r?.from && r?.to ? differenceInCalendarDays(r.to, r.from) + 1 : null,
+                      dates_flexible: false,
+                    });
+                  }}
+                  disabled={(d) => d < new Date(new Date().setHours(0, 0, 0, 0))}
+                  initialFocus
+                  className="pointer-events-auto mx-auto"
+                  classNames={{
+                    months: "flex flex-col sm:flex-row gap-4",
+                    month: "space-y-4",
+                  }}
+                />
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-3 gap-2">
+                  {[3, 5, 7, 10, 14, 21].map((n) => (
+                    <button
+                      key={n}
+                      onClick={() => draft.patch({
+                        duration_days: n,
+                        start_date: null,
+                        end_date: null,
+                        dates_flexible: true,
+                      })}
+                      className={cn(
+                        "rounded-2xl border-2 p-4 text-center transition",
+                        draft.duration_days === n
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:border-primary/40",
+                      )}
+                    >
+                      <div className="font-display text-3xl">{n}</div>
+                      <div className="text-xs text-muted-foreground">days</div>
+                    </button>
+                  ))}
+                </div>
+                <Input
+                  type="number"
+                  min={1}
+                  max={60}
+                  placeholder="Custom (1–60 days)"
+                  value={draft.duration_days && ![3, 5, 7, 10, 14, 21].includes(draft.duration_days) ? draft.duration_days : ""}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value, 10);
+                    draft.patch({
+                      duration_days: Number.isFinite(v) && v > 0 ? Math.min(60, v) : null,
+                      start_date: null,
+                      end_date: null,
+                      dates_flexible: true,
+                    });
+                  }}
+                  className="h-12 rounded-xl"
+                />
+              </>
+            )}
           </div>
-          <Input
-            type="number"
-            min={1}
-            max={60}
-            placeholder="Custom (1–60 days)"
-            value={draft.duration_days && ![3, 5, 7, 10, 14, 21].includes(draft.duration_days) ? draft.duration_days : ""}
-            onChange={(e) => {
-              const v = parseInt(e.target.value, 10);
-              draft.patch({
-                duration_days: Number.isFinite(v) && v > 0 ? Math.min(60, v) : null,
-                start_date: null,
-                end_date: null,
-                dates_flexible: true,
-              });
-            }}
-            className="h-12 rounded-xl"
-          />
-        </>
+        )}
+      </div>
+
+      {picked && ((draft.start_date && draft.end_date) || draft.duration_days) && (
+        <Card className="flex items-center gap-3 rounded-2xl border-0 bg-primary/5 p-4 shadow-soft">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/15 text-primary">
+            <Check className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-display text-lg leading-tight">{picked.name}</p>
+            <p className="truncate text-xs text-muted-foreground">{dateLabel}</p>
+          </div>
+        </Card>
       )}
     </div>
   );
 }
+
 
 function RadarStep() {
   const draft = usePlanDraft();
