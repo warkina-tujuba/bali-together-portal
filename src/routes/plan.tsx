@@ -62,8 +62,8 @@ function PlanSearch() {
   const range = useMemo<DateRange | undefined>(() => {
     if (!draft.start_date) return undefined;
     const from = parseISO(draft.start_date + "T00:00:00");
-    const to = draft.end_date ? parseISO(draft.end_date + "T00:00:00") : undefined;
-    return { from, to };
+    if (draft.end_date) return { from, to: parseISO(draft.end_date + "T00:00:00") };
+    return { from };
   }, [draft.start_date, draft.end_date]);
 
   const dateLabel = useMemo(() => {
