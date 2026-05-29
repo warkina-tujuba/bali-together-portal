@@ -239,10 +239,10 @@ function DatesStep() {
 
       {mode === "dates" ? (
         <>
-          <div className="flex justify-center rounded-2xl border bg-card p-2">
+          <div className="overflow-x-auto rounded-2xl border bg-card p-2">
             <Calendar
               mode="range"
-              numberOfMonths={1}
+              numberOfMonths={2}
               selected={range}
               onSelect={(r) => {
                 draft.patch({
@@ -254,7 +254,11 @@ function DatesStep() {
               }}
               disabled={(d) => d < new Date(new Date().setHours(0, 0, 0, 0))}
               initialFocus
-              className="pointer-events-auto"
+              className="pointer-events-auto mx-auto"
+              classNames={{
+                months: "flex flex-col sm:flex-row gap-4",
+                month: "space-y-4",
+              }}
             />
           </div>
           {draft.start_date && draft.end_date && (
