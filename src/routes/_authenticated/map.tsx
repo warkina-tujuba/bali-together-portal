@@ -3,12 +3,31 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { getDashboard, getItinerary, updateMyLocation, stopSharingLocation, listLiveLocations } from "@/lib/trip.functions";
+import { computeLeg } from "@/lib/routing.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { Switch } from "@/components/ui/switch";
 import { MapPin, Radio } from "lucide-react";
 import { GoogleMap, type GMapPin, type GMapAvatar } from "@/components/maps/GoogleMap";
 import { CrewLayerToggle, type CrewLayer } from "@/components/plan/CrewLayerToggle";
 import { cn } from "@/lib/utils";
+
+// Decode Google's encoded polyline format into [lng, lat] pairs
+function decodePolyline(encoded: string): [number, number][] {
+  const points: [number, number][] = [];
+  let index = 0, lat = 0, lng = 0;
+  while (index < encoded.length) {
+    let b: number, shift = 0, result = 0;
+    do { b = encoded.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+    const dlat = (result & 1) ? ~(result >> 1) : (result >> 1);
+    lat += dlat;
+    shift = 0; result = 0;
+    do { b = encoded.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+    const dlng = (result & 1) ? ~(result >> 1) : (result >> 1);
+    lng += dlng;
+    points.push([lng / 1e5, lat / 1e5]);
+  }
+  return points;
+}
 
 export const Route = createFileRoute("/_authenticated/map")({ component: MapPage });
 
@@ -121,6 +140,47 @@ function MapPage() {
     return crewLayer === "mine" ? isMe : !isMe;
   };
 
+  // Stops for the selected day (sorted by start_time)
+  const dayStops = useMemo(() => {
+    if (!selectedDay || !itin?.activities) return [];
+    return itin.activities
+      .filter((a) => a.day_date === selectedDay && a.lat != null && a.lng != null)
+      .sort((a, b) => (a.start_time ?? "").localeCompare(b.start_time ?? ""))
+      .map((a) => ({ id: a.id, title: a.title, lat: a.lat as number, lng: a.lng as number, start_time: a.start_time }));
+  }, [selectedDay, itin]);
+
+  // Fetch driving polylines between consecutive stops
+  const legFn = useServerFn(computeLeg);
+  const { data: drivingRoute } = useQuery({
+    enabled: dayStops.length >= 2,
+    queryKey: ["dayRoute", selectedDay, dayStops.map((s) => s.id)],
+    queryFn: async () => {
+      const legs = await Promise.all(
+        dayStops.slice(0, -1).map((o, i) => {
+          const d = dayStops[i + 1];
+          return legFn({ data: { origin: { lat: o.lat, lng: o.lng }, dest: { lat: d.lat, lng: d.lng }, hour: 12 } })
+            .catch(() => null);
+        }),
+      );
+      const coords: [number, number][] = [];
+      legs.forEach((leg, i) => {
+        if (leg?.polyline) {
+          const pts = decodePolyline(leg.polyline);
+          if (i === 0) coords.push(...pts);
+          else coords.push(...pts.slice(1));
+        } else {
+          // fallback straight line for this segment
+          const o = dayStops[i], d = dayStops[i + 1];
+          if (coords.length === 0) coords.push([o.lng, o.lat]);
+          coords.push([d.lng, d.lat]);
+        }
+      });
+      const totalMin = legs.reduce((s, l) => s + (l?.duration_min ?? 0), 0);
+      const totalKm = legs.reduce((s, l) => s + Number(l?.distance_km ?? 0), 0);
+      return { coords, totalMin, totalKm };
+    },
+  });
+
   const { pins, avatars, center, zoom, routeCoords } = useMemo(() => {
     const c: [number, number] = [
       data?.trip?.map_center_lng ?? 115.0875,
@@ -130,7 +190,6 @@ function MapPage() {
     if (!data) return { pins: [] as GMapPin[], avatars: [] as GMapAvatar[], center: c, zoom: z, routeCoords: undefined as [number, number][] | undefined };
     const memberById = new Map(data.members.map((m) => [m.id, m]));
 
-    // Stays filtered by crew layer
     const stayPins: GMapPin[] = data.stays
       .filter((s) => s.lat != null && s.lng != null && matchesCrewLayer(s.user_id))
       .map((s) => {
@@ -146,25 +205,22 @@ function MapPage() {
         };
       });
 
-    // Day activities
-    let activityPins: GMapPin[] = [];
-    let route: [number, number][] | undefined;
-    if (selectedDay && itin?.activities) {
-      const dayActs = itin.activities
-        .filter((a) => a.day_date === selectedDay && a.lat != null && a.lng != null)
-        .sort((a, b) => (a.start_time ?? "").localeCompare(b.start_time ?? ""));
-      activityPins = dayActs.map((a, idx) => ({
-        id: `act-${a.id}`,
-        lat: a.lat as number,
-        lng: a.lng as number,
-        label: `${idx + 1}. ${a.title}`,
-        sub: a.start_time ?? undefined,
-        kind: "activity" as const,
-      }));
-      if (dayActs.length >= 2) {
-        route = dayActs.map((a) => [a.lng as number, a.lat as number]);
-      }
-    }
+    const activityPins: GMapPin[] = dayStops.map((a, idx) => ({
+      id: `act-${a.id}`,
+      lat: a.lat,
+      lng: a.lng,
+      label: `${idx + 1}. ${a.title}`,
+      sub: a.start_time ?? undefined,
+      kind: "activity" as const,
+    }));
+
+    // Prefer real driving polyline; fall back to straight line through stops
+    const route: [number, number][] | undefined =
+      drivingRoute?.coords && drivingRoute.coords.length > 1
+        ? drivingRoute.coords
+        : dayStops.length >= 2
+          ? dayStops.map((a) => [a.lng, a.lat] as [number, number])
+          : undefined;
 
     const avatarList: GMapAvatar[] = liveLocs
       .filter((loc) => matchesCrewLayer(loc.user_id))
@@ -179,9 +235,11 @@ function MapPage() {
         };
       });
 
+
+
     return { pins: [...stayPins, ...activityPins], avatars: avatarList, center: c, zoom: z, routeCoords: route };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, liveLocs, itin, selectedDay, crewLayer, meId]);
+  }, [data, liveLocs, dayStops, drivingRoute, crewLayer, meId]);
 
   if (!data) return <div className="p-10 text-center text-muted-foreground">Loading map…</div>;
   if (!data.trip) return <div className="p-10 text-center text-muted-foreground">No trip.</div>;
@@ -236,10 +294,20 @@ function MapPage() {
         <GoogleMap center={center} zoom={zoom} pins={pins} avatars={avatars} routeCoords={routeCoords} />
       </div>
       <p className="px-2 pt-2 text-xs text-muted-foreground">
-        {selectedDay
-          ? "Showing the day's route between activities, plus bases for your selected crew layer."
-          : "Showing bases for your selected crew layer. Pick a day above to see that day's route."}
-        {" "}Live location is only visible to your trip group, and only while this page is open.
+        {selectedDay ? (
+          dayStops.length >= 2 ? (
+            <>
+              Day route: {dayStops.length} stops
+              {drivingRoute ? ` · ${Math.round(drivingRoute.totalMin)} min driving · ${drivingRoute.totalKm.toFixed(1)} km` : " · calculating driving route…"}
+              {". "}
+            </>
+          ) : (
+            <>Add at least 2 located activities to this day to see a route. </>
+          )
+        ) : (
+          <>Showing bases for your selected crew layer. Pick a day above to see that day's route. </>
+        )}
+        Live location is only visible to your trip group, and only while this page is open.
       </p>
     </div>
   );
