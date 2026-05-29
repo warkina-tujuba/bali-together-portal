@@ -1,3 +1,4 @@
+/// <reference types="google.maps" />
 /**
  * Singleton loader for the Google Maps JavaScript API.
  * Ensures the script tag is injected only once across the app.
