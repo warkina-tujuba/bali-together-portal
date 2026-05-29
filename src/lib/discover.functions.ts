@@ -19,6 +19,9 @@ export type SeedCard = {
   review_count: number;
   price_band: number;
   distance_km?: number | null;
+  google_place_id: string | null;
+  google_maps_url: string | null;
+  google_address: string | null;
 };
 
 const FilterSchema = z.object({
