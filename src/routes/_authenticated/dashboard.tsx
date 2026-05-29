@@ -350,21 +350,25 @@ function Dashboard() {
       <div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
         {/* LEFT: week calendar */}
         <div className="min-w-0 space-y-4">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="font-display text-xl">Plan</h2>
+            <CrewLayerToggle value={crewLayer} onChange={setCrewLayer} crewCount={data.members.length} />
+          </div>
           <WeekCalendar
             days={days}
-            activities={(data.activities ?? []).map((a: Activity): CalActivity => ({
+            activities={visibleActivities.map((a): CalActivity => ({
               id: a.id,
               day_date: a.day_date,
               start_time: a.start_time,
               end_time: a.end_time,
-              duration_min: (a as Activity & { duration_min?: number | null }).duration_min ?? 60,
+              duration_min: a.duration_min ?? 60,
               title: a.title,
               location: a.location,
               is_host_event: a.is_host_event,
               lat: a.lat,
               lng: a.lng,
             }))}
-            legsByDay={new Map()}
+            legsByDay={legsByDay}
             selectedDay={activeDay}
             onSelectDay={(d) => setSelectedDay(d)}
             onSlotClick={(d, hm) => {
@@ -382,8 +386,12 @@ function Dashboard() {
                 const act = (data.activities ?? []).find((a: Activity) => a.id === id);
                 await moveActFn({ data: {
                   id, day_date: d, start_time: `${hh}:${mm}`,
-                  duration_min: (act as Activity & { duration_min?: number | null })?.duration_min ?? 60,
+                  duration_min: act?.duration_min ?? 60,
                 } });
+                // unpark if it was in the backlog
+                if (act?.parked) {
+                  await parkFn({ data: { activity_id: id, parked: false } }).catch(() => {});
+                }
                 qc.invalidateQueries({ queryKey: ["itineraryHome"] });
               } catch (e) { toast.error(e instanceof Error ? e.message : "Couldn't move"); }
             }}
@@ -398,6 +406,26 @@ function Dashboard() {
               } finally { setOptLoading(false); }
             }}
           />
+
+          <BacklogTray
+            items={backlogItems}
+            onOpen={(id) => setDetailId(id)}
+            onSchedule={async (id) => {
+              try {
+                await moveActFn({ data: { id, day_date: activeDay, start_time: "09:00", duration_min: backlogItems.find((b) => b.id === id)?.duration_min ?? 60 } });
+                await parkFn({ data: { activity_id: id, parked: false } });
+                toast.success("Scheduled");
+                qc.invalidateQueries({ queryKey: ["itineraryHome"] });
+              } catch (e) { toast.error(e instanceof Error ? e.message : "Couldn't schedule"); }
+            }}
+            onRemove={async (id) => {
+              try {
+                await parkFn({ data: { activity_id: id, parked: false } });
+                qc.invalidateQueries({ queryKey: ["itineraryHome"] });
+              } catch (e) { toast.error(e instanceof Error ? e.message : "Couldn't remove"); }
+            }}
+          />
+
 
           {/* Recommendations */}
           <Card className="rounded-3xl border-0 p-4 shadow-soft sm:p-5">
