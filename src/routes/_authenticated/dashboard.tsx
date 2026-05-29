@@ -116,7 +116,7 @@ function Dashboard() {
 
   const isAdmin = !!adminData?.admin;
 
-  const days = useMemo(() => data?.trip ? dateRange(data.trip.start_date, data.trip.end_date) : [], [data?.trip]);
+  const days = useMemo(() => data?.trip?.start_date && data.trip.end_date ? dateRange(data.trip.start_date, data.trip.end_date) : [], [data?.trip]);
   const activeDay = selectedDay ?? days[0];
 
 
