@@ -301,22 +301,52 @@ function Dashboard() {
       </div>
 
       {/* Setup prompts for skipped onboarding steps */}
-      <div className="mb-3">
-        <SetupPrompts
-          staysCount={data.stays.length}
-          plannedPlacesCount={(data as any).plannedPlaces?.length ?? 0}
-          flightsCount={data.flights.filter((f: any) => f.user_id === data.userId).length}
-          hasPreferences={!!(data as any).preferences}
-          onAddStay={() => setStayOpen(true)}
-          onAddFlight={() => setFlightOpen(true)}
-        />
-      </div>
-      <FlightDialog
-        defaultDate={trip.start_date}
-        open={flightOpen}
-        onOpenChange={setFlightOpen}
-      />
-      <StayDialog open={stayOpen} onOpenChange={setStayOpen} />
+      {(() => {
+        const myFlightCount = data.flights.filter((f: any) => f.user_id === data.userId).length;
+        const plannedCount = (data as any).plannedPlaces?.length ?? 0;
+        const hasPrefs = !!(data as any).preferences;
+        const items: React.ReactNode[] = [];
+        if (data.stays.length === 0) {
+          items.push(
+            <StayDialog key="stay" trigger={
+              <button className="flex min-w-[240px] snap-start items-start gap-3 rounded-2xl border border-dashed bg-card p-4 text-left">
+                <div className="rounded-lg bg-primary/10 p-2 text-primary"><HomeIcon className="h-5 w-5" /></div>
+                <div><div className="text-sm font-semibold">Add your stay</div><p className="text-xs text-muted-foreground">Unlock route planning and nearby recs.</p></div>
+              </button>
+            } />
+          );
+        }
+        if (myFlightCount === 0) {
+          items.push(
+            <FlightDialog key="flight" defaultDate={trip.start_date} trigger={
+              <button className="flex min-w-[240px] snap-start items-start gap-3 rounded-2xl border border-dashed bg-card p-4 text-left">
+                <div className="rounded-lg bg-primary/10 p-2 text-primary"><Plane className="h-5 w-5" /></div>
+                <div><div className="text-sm font-semibold">Add arrival details</div><p className="text-xs text-muted-foreground">Let the crew know when you land.</p></div>
+              </button>
+            } />
+          );
+        }
+        if (plannedCount === 0) {
+          items.push(
+            <Link key="places" to="/discover" className="flex min-w-[240px] snap-start items-start gap-3 rounded-2xl border border-dashed bg-card p-4 text-left">
+              <div className="rounded-lg bg-primary/10 p-2 text-primary"><MapPin className="h-5 w-5" /></div>
+              <div><div className="text-sm font-semibold">Add places on your radar</div><p className="text-xs text-muted-foreground">Improve recommendations.</p></div>
+            </Link>
+          );
+        }
+        if (!hasPrefs) {
+          items.push(
+            <Link key="vibe" to="/dashboard" className="flex min-w-[240px] snap-start items-start gap-3 rounded-2xl border border-dashed bg-card p-4 text-left">
+              <div className="rounded-lg bg-primary/10 p-2 text-primary"><Sparkles className="h-5 w-5" /></div>
+              <div><div className="text-sm font-semibold">Set your trip vibe</div><p className="text-xs text-muted-foreground">Tune discovery to your style.</p></div>
+            </Link>
+          );
+        }
+        if (items.length === 0) return null;
+        return (
+          <div className="mb-3 -mx-1 flex gap-3 overflow-x-auto px-1 pb-2 snap-x">{items}</div>
+        );
+      })()}
 
       {/* Date strip */}
       <div className="mb-3 -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
