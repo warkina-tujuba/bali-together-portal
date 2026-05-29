@@ -14,6 +14,7 @@ import { Route as ChooseRouteImport } from './routes/choose'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedStartRouteImport } from './routes/_authenticated/start'
+import { Route as AuthenticatedSavedRouteImport } from './routes/_authenticated/saved'
 import { Route as AuthenticatedMapRouteImport } from './routes/_authenticated/map'
 import { Route as AuthenticatedItineraryRouteImport } from './routes/_authenticated/itinerary'
 import { Route as AuthenticatedDiscoverRouteImport } from './routes/_authenticated/discover'
@@ -44,6 +45,11 @@ const IndexRoute = IndexRouteImport.update({
 const AuthenticatedStartRoute = AuthenticatedStartRouteImport.update({
   id: '/start',
   path: '/start',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedSavedRoute = AuthenticatedSavedRouteImport.update({
+  id: '/saved',
+  path: '/saved',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedMapRoute = AuthenticatedMapRouteImport.update({
@@ -93,6 +99,7 @@ export interface FileRoutesByFullPath {
   '/discover': typeof AuthenticatedDiscoverRoute
   '/itinerary': typeof AuthenticatedItineraryRoute
   '/map': typeof AuthenticatedMapRoute
+  '/saved': typeof AuthenticatedSavedRoute
   '/start': typeof AuthenticatedStartRoute
 }
 export interface FileRoutesByTo {
@@ -106,6 +113,7 @@ export interface FileRoutesByTo {
   '/discover': typeof AuthenticatedDiscoverRoute
   '/itinerary': typeof AuthenticatedItineraryRoute
   '/map': typeof AuthenticatedMapRoute
+  '/saved': typeof AuthenticatedSavedRoute
   '/start': typeof AuthenticatedStartRoute
 }
 export interface FileRoutesById {
@@ -121,6 +129,7 @@ export interface FileRoutesById {
   '/_authenticated/discover': typeof AuthenticatedDiscoverRoute
   '/_authenticated/itinerary': typeof AuthenticatedItineraryRoute
   '/_authenticated/map': typeof AuthenticatedMapRoute
+  '/_authenticated/saved': typeof AuthenticatedSavedRoute
   '/_authenticated/start': typeof AuthenticatedStartRoute
 }
 export interface FileRouteTypes {
@@ -136,6 +145,7 @@ export interface FileRouteTypes {
     | '/discover'
     | '/itinerary'
     | '/map'
+    | '/saved'
     | '/start'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -149,6 +159,7 @@ export interface FileRouteTypes {
     | '/discover'
     | '/itinerary'
     | '/map'
+    | '/saved'
     | '/start'
   id:
     | '__root__'
@@ -163,6 +174,7 @@ export interface FileRouteTypes {
     | '/_authenticated/discover'
     | '/_authenticated/itinerary'
     | '/_authenticated/map'
+    | '/_authenticated/saved'
     | '/_authenticated/start'
   fileRoutesById: FileRoutesById
 }
@@ -208,6 +220,13 @@ declare module '@tanstack/react-router' {
       path: '/start'
       fullPath: '/start'
       preLoaderRoute: typeof AuthenticatedStartRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/saved': {
+      id: '/_authenticated/saved'
+      path: '/saved'
+      fullPath: '/saved'
+      preLoaderRoute: typeof AuthenticatedSavedRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/map': {
@@ -270,6 +289,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedDiscoverRoute: typeof AuthenticatedDiscoverRoute
   AuthenticatedItineraryRoute: typeof AuthenticatedItineraryRoute
   AuthenticatedMapRoute: typeof AuthenticatedMapRoute
+  AuthenticatedSavedRoute: typeof AuthenticatedSavedRoute
   AuthenticatedStartRoute: typeof AuthenticatedStartRoute
 }
 
@@ -281,6 +301,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedDiscoverRoute: AuthenticatedDiscoverRoute,
   AuthenticatedItineraryRoute: AuthenticatedItineraryRoute,
   AuthenticatedMapRoute: AuthenticatedMapRoute,
+  AuthenticatedSavedRoute: AuthenticatedSavedRoute,
   AuthenticatedStartRoute: AuthenticatedStartRoute,
 }
 
@@ -297,3 +318,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
