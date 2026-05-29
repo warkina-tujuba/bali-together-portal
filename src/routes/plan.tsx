@@ -68,9 +68,9 @@ function PlanSearch() {
 
   const dateLabel = useMemo(() => {
     if (!draft.start_date) return "When?";
-    const start = format(new Date(draft.start_date), "MMM d");
+    const start = format(parseISO(draft.start_date + "T00:00:00"), "MMM d");
     if (mode === "one-way" || !draft.end_date) return start;
-    return `${start} → ${format(new Date(draft.end_date), "MMM d")}`;
+    return `${start} → ${format(parseISO(draft.end_date + "T00:00:00"), "MMM d")}`;
   }, [draft.start_date, draft.end_date, mode]);
 
   const canSearch = !!to && !!draft.start_date && (mode === "one-way" || !!draft.end_date);
