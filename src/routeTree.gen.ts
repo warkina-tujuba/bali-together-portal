@@ -22,6 +22,7 @@ import { Route as AuthenticatedDashboardRouteImport } from './routes/_authentica
 import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated/chat'
 import { Route as AuthenticatedAgendaRouteImport } from './routes/_authenticated/agenda'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as ApiPublicPlacePhotoRouteImport } from './routes/api/public/place-photo'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -87,6 +88,11 @@ const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const ApiPublicPlacePhotoRoute = ApiPublicPlacePhotoRouteImport.update({
+  id: '/api/public/place-photo',
+  path: '/api/public/place-photo',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -101,6 +107,7 @@ export interface FileRoutesByFullPath {
   '/map': typeof AuthenticatedMapRoute
   '/saved': typeof AuthenticatedSavedRoute
   '/start': typeof AuthenticatedStartRoute
+  '/api/public/place-photo': typeof ApiPublicPlacePhotoRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -115,6 +122,7 @@ export interface FileRoutesByTo {
   '/map': typeof AuthenticatedMapRoute
   '/saved': typeof AuthenticatedSavedRoute
   '/start': typeof AuthenticatedStartRoute
+  '/api/public/place-photo': typeof ApiPublicPlacePhotoRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -131,6 +139,7 @@ export interface FileRoutesById {
   '/_authenticated/map': typeof AuthenticatedMapRoute
   '/_authenticated/saved': typeof AuthenticatedSavedRoute
   '/_authenticated/start': typeof AuthenticatedStartRoute
+  '/api/public/place-photo': typeof ApiPublicPlacePhotoRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -147,6 +156,7 @@ export interface FileRouteTypes {
     | '/map'
     | '/saved'
     | '/start'
+    | '/api/public/place-photo'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -161,6 +171,7 @@ export interface FileRouteTypes {
     | '/map'
     | '/saved'
     | '/start'
+    | '/api/public/place-photo'
   id:
     | '__root__'
     | '/'
@@ -176,6 +187,7 @@ export interface FileRouteTypes {
     | '/_authenticated/map'
     | '/_authenticated/saved'
     | '/_authenticated/start'
+    | '/api/public/place-photo'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -183,6 +195,7 @@ export interface RootRouteChildren {
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   ChooseRoute: typeof ChooseRoute
   LoginRoute: typeof LoginRoute
+  ApiPublicPlacePhotoRoute: typeof ApiPublicPlacePhotoRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -278,6 +291,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/api/public/place-photo': {
+      id: '/api/public/place-photo'
+      path: '/api/public/place-photo'
+      fullPath: '/api/public/place-photo'
+      preLoaderRoute: typeof ApiPublicPlacePhotoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -314,7 +334,18 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   ChooseRoute: ChooseRoute,
   LoginRoute: LoginRoute,
+  ApiPublicPlacePhotoRoute: ApiPublicPlacePhotoRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
