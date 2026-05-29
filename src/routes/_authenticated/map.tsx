@@ -239,7 +239,7 @@ function MapPage() {
 
     return { pins: [...stayPins, ...activityPins], avatars: avatarList, center: c, zoom: z, routeCoords: route };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, liveLocs, itin, selectedDay, crewLayer, meId]);
+  }, [data, liveLocs, dayStops, drivingRoute, crewLayer, meId]);
 
   if (!data) return <div className="p-10 text-center text-muted-foreground">Loading map…</div>;
   if (!data.trip) return <div className="p-10 text-center text-muted-foreground">No trip.</div>;
