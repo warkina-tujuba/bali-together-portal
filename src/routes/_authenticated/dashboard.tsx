@@ -85,6 +85,8 @@ function Dashboard() {
   const applyFn = useServerFn(applyDaySchedule);
   const createActFn = useServerFn(createCustomActivity);
   const moveActFn = useServerFn(updateActivitySchedule);
+  const parkFn = useServerFn(setActivityParked);
+  const computeLegFn = useServerFn(computeLeg);
   const qc = useQueryClient();
 
   const { data, isLoading } = useQuery({ queryKey: ["itineraryHome"], queryFn: () => homeFn() });
@@ -95,6 +97,7 @@ function Dashboard() {
   const [popularity, setPopularity] = useState(3);
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [crewLayer, setCrewLayer] = useState<CrewLayer>("both");
 
   // Add / detail / optimise state
   const [addOpen, setAddOpen] = useState(false);
