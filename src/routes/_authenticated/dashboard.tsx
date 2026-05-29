@@ -485,8 +485,10 @@ function Dashboard() {
               pins={mapPins as SnapPin[]}
               avatars={[]}
               focusedId={focusedId}
+              routeCoords={routeCoords}
               onPinClick={(id) => { if (!id.startsWith("stay-")) setDetailId(id); }}
             />
+
           </Card>
         </div>
       </div>
