@@ -123,11 +123,23 @@ function MapPage() {
     if (!next) await stopLoc().catch(() => {});
   };
 
-  // Days available
+  // Days available — prefer itinerary_days, fall back to deriving from the trip's date range
   const days = useMemo(() => {
-    const list = (itin?.days ?? []).slice().sort((a, b) => (a.day_date < b.day_date ? -1 : 1));
-    return list;
-  }, [itin]);
+    const fromItin = (itin?.days ?? []).slice().sort((a, b) => (a.day_date < b.day_date ? -1 : 1));
+    if (fromItin.length > 0) return fromItin.map((d) => ({ id: d.id, day_date: d.day_date }));
+    const start = data?.trip?.start_date;
+    const end = data?.trip?.end_date;
+    if (!start || !end) return [];
+    const out: { id: string; day_date: string }[] = [];
+    const s = new Date(start + "T00:00:00");
+    const e = new Date(end + "T00:00:00");
+    for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) {
+      const iso = d.toISOString().slice(0, 10);
+      out.push({ id: iso, day_date: iso });
+    }
+    return out;
+  }, [itin, data?.trip?.start_date, data?.trip?.end_date]);
+
 
   const crewCount = useMemo(() => {
     if (!data?.members) return 0;
