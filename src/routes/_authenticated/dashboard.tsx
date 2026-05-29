@@ -48,6 +48,12 @@ type Activity = {
   booking_url: string | null;
   created_by: string | null;
   category: string;
+  parked?: boolean | null;
+  scope?: "core" | "personal" | "shared" | null;
+  owner_user_id?: string | null;
+  duration_min?: number | null;
+  cost_usd?: number | null;
+  website_url?: string | null;
 };
 
 type Rsvp = { activity_id: string; user_id: string; status: "going" | "maybe" | "declined" };
