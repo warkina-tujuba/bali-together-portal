@@ -92,6 +92,34 @@ export const unsubscribeFromActivity = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// Park / unpark an activity (move between calendar and backlog)
+export const setActivityParked = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) =>
+    z.object({
+      activity_id: z.string().uuid(),
+      parked: z.boolean(),
+    }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { userId } = context;
+    const { data: act } = await supabaseAdmin
+      .from("activities")
+      .select("owner_user_id, created_by")
+      .eq("id", data.activity_id)
+      .maybeSingle();
+    if (!act) throw new Error("Not found");
+    if (act.owner_user_id !== userId && act.created_by !== userId) {
+      throw new Error("Not yours to move");
+    }
+    const { error } = await supabaseAdmin
+      .from("activities")
+      .update({ parked: data.parked })
+      .eq("id", data.activity_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
 // Crew view: who's subscribed to what (plus stub source ids)
 export const listSubscriptions = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
