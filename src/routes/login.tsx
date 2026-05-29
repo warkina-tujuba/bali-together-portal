@@ -37,7 +37,7 @@ function LoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      const dest = invite ? `/start?invite=${invite}` : "/choose";
+      const dest = invite ? `/plan?invite=${invite}` : "/plan";
       if (mode === "signup") {
         const { error } = await supabase.auth.signUp({
           email, password,
@@ -52,8 +52,8 @@ function LoginPage() {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         toast.success("Welcome back");
-        if (invite) navigate({ to: "/start", search: { invite } });
-        else navigate({ to: "/choose" });
+        if (invite) navigate({ to: "/plan", search: { invite } });
+        else navigate({ to: "/plan" });
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Auth failed");
@@ -65,14 +65,14 @@ function LoginPage() {
   async function handleGoogle() {
     setLoading(true);
     try {
-      const dest = invite ? `/start?invite=${invite}` : "/choose";
+      const dest = invite ? `/plan?invite=${invite}` : "/plan";
       const result = await lovable.auth.signInWithOAuth("google", {
         redirect_uri: `${window.location.origin}${dest}`,
       });
       if (result.error) throw new Error(result.error.message ?? "Google sign-in failed");
       if (result.redirected) return;
-      if (invite) navigate({ to: "/start", search: { invite } });
-      else navigate({ to: "/choose" });
+      if (invite) navigate({ to: "/plan", search: { invite } });
+      else navigate({ to: "/plan" });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Google sign-in failed");
       setLoading(false);
