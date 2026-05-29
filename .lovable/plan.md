@@ -1,124 +1,138 @@
-# Refocus: Exposure → Plan → Share
 
-Strip the existing surface area down to three feature pillars. Onboarding stays out of scope for this pass; we assume the user lands with a `trip_id` and a destination.
+# Discover page redesign — mobile-first
 
-## 1. Exposure — `/discover`
+Reuses existing data, "Near me" geolocation, map (SnapMap), heart/save behaviour, and itinerary functions. No backend or schema changes; all work is in frontend components on `/discover` plus the activity detail drawer.
 
-A filterable, visual catalogue of activities for the current destination.
+## 1. Mobile top bar (replaces big "Travel Link / Sign out" header)
 
-**UI**
+Update `src/routes/_authenticated.tsx` mobile header to:
+- Left: hamburger (opens a Sheet with: Profile, My plan, Saved, Host mode, Sign out)
+- Centre: "Travel Link" wordmark
+- Right: search icon (focuses hero search) + avatar
+- Hide "Sign out" from the top bar; it moves into the hamburger sheet.
 
-- Top filter bar (chips, multi-select): `Near me`, `Must do`, `Cheap` (<$25), `Foodie`, `Adventure`, `Culture`, `Nightlife`, `Family`. Plus a duration slider and a price range.
-- Grid of rich activity cards: hero image, title, 1-line description, ★ rating, $ cost, ⏱ duration, distance from stay.
-- Click card → `ActivityDetailDrawer` (already exists, expand): gallery, full description, reviews, address, website, "Add to plan" CTA with day picker.
-- "Near me" uses the user's live location (or the trip's stay coordinates as fallback) and sorts by distance via Haversine.
+Desktop keeps the existing header.
 
-**Data**
+## 2. New `/discover` layout (mobile order)
 
-- Use existing `activity_seeds` table — add columns: `rating numeric`, `review_count int`, `price_band smallint` (1–4), `tags text[]` already present.
-- Server fn `listSeeds({ destination_slug, filters, near })` returns sorted, filtered seeds.
-- Seed 30–50 high-quality entries for Bali (extend `src/data/bali-activities.ts` → migration insert).
-
-## 2. Plan — `/plan` (replaces current dashboard)
-
-**Layout**: 60% week calendar, 40% map (already scaffolded in `WeekCalendar` + `SnapMap`).
-
-**Calendar behavior**
-
-- Vertical day columns, 07:00–23:00, 15-min grid.
-- Activity tile height ∝ `duration_min` (already wired).
-- Drag tile vertically → reschedule (already wired); drag horizontally across days → move day.
-- **Travel connectors**: between consecutive activities on the same day, render a dashed line + chip "🚗 18 min · 6 km" computed via `computeLeg` (existing). Cache hits make this instant on re-render.
-- Click an empty slot → AddActivitySheet (existing). Activities added from `/discover` appear here. This is also when User can create their own event (UX simialr to facebook events)
-- "✨ Optimise this day" button → `optimiseDay` server fn (existing) → diff dialog → accept rewrites times.
-- A key focus on a user interface that mirrors Google Calendar. 
-
-**Map**
-
-- Pins for stay + every activity with coords. Each day is assumed to start and finsh at day (i.e. last activity needs to direct back home)
-- Polyline connects the selected day's activities in scheduled order, colored by travel mode.
-- Hover tile ↔ highlight pin (two-way).
-
-**Backlog tray** (under calendar)
-
-- Activities added from `/discover` without a time land here. Drag onto calendar to schedule.
-- New column on `activities`: `parked boolean default false` (when true, ignore day_date/start_time in calendar render).
-
-## 3. Share — crew visibility
-
-**Model**
-
-- `activities.scope` already exists (`core` | `personal`). Add a third: `shared` (personal but visible to crew).
-- New table `activity_subscriptions(user_id, activity_id, created_at)` — when a crew member "subscribes", a personal copy is cloned into their schedule, linked back via `source_activity_id`.
-- When users clicks link and is onboarded, request is sent to user to confirm subscription. 
-
-**UI**
-
-- Each activity tile shows mini-avatars of crew who've subscribed at bottom of tile. 
-- `/plan` has a **Crew layer toggle**: "My plan" | "Crew" | "Both". In Crew/Both, render crew members' activities as translucent tiles in their owner's avatar color.
-- In `ActivityDetailDrawer`: "Subscribe — add to my plan" button (hidden for own activities). Subscribing clones the activity into the user's schedule at the same time slot.
-- RLS: crew members already read each other's activities via `trip_id = current_user_trip_id()`. We keep `personal` private to the owner; only `core` and `shared` are visible to other crew.
-
-## Database migration
-
-```sql
--- Seeds enrichment
-ALTER TABLE activity_seeds
-  ADD COLUMN rating numeric(2,1),
-  ADD COLUMN review_count int DEFAULT 0,
-  ADD COLUMN price_band smallint DEFAULT 2;
-
--- Backlog tray
-ALTER TABLE activities ADD COLUMN parked boolean NOT NULL DEFAULT false;
-
--- Sharing
-ALTER TYPE activity_scope ADD VALUE 'shared';
-ALTER TABLE activities ADD COLUMN source_activity_id uuid REFERENCES activities(id) ON DELETE SET NULL;
-
-CREATE TABLE activity_subscriptions (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL,
-  activity_id uuid NOT NULL REFERENCES activities(id) ON DELETE CASCADE,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE(user_id, activity_id)
-);
-ALTER TABLE activity_subscriptions ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users manage own subs" ON activity_subscriptions
-  FOR ALL TO authenticated USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
-CREATE POLICY "Trip members read subs" ON activity_subscriptions FOR SELECT TO authenticated
-  USING (EXISTS (SELECT 1 FROM activities a WHERE a.id = activity_id AND a.trip_id = current_user_trip_id()));
-
--- Updated RLS for activities: personal stays private, shared is visible
-DROP POLICY IF EXISTS "Authenticated read activities" ON activities;
-CREATE POLICY "Trip read core+shared" ON activities FOR SELECT TO authenticated
-  USING (trip_id = current_user_trip_id() AND (scope IN ('core','shared') OR owner_user_id = auth.uid()));
 ```
+[ Mobile top bar ]
+[ Hero card — "Discover Bali" w/ overlay + quick chips ]
+[ Search row: input · Near me · Filters · Map ]
+[ Horizontal-scroll category chip rail ]
+[ View toggle: Grid | Map  (mobile) / Grid | Map | Split (≥md) ]
+[ Activity card feed  OR  full-bleed map ]
+[ Bottom nav ]
+```
+
+Removes the tall "FIND YOUR TRIP / Discover / Tap a card…" block and the inline sliders. Intro copy folds into the hero subtitle.
+
+### Hero card (`DiscoverHero.tsx`)
+- Large rounded image (use destination cover from `home.trip` if available, else a Bali fallback in `src/assets`)
+- Overlay gradient + title "Discover Bali" / subtitle "Find experiences that fit your itinerary"
+- Quick chips: **Near me**, **Today**, **Must do** — each toggles the matching filter and scrolls to results.
+
+### Search row (`DiscoverSearchRow.tsx`)
+Compact pill input + 3 icon buttons (Near me, Filters, Map). Replaces today's search+Near me only.
+
+### Category rail
+Refactor existing `FilterBar` chips into `CategoryRail.tsx` — single-row horizontally scrollable (snap-x, hidden scrollbar). Same chip list the spec calls for, plus a trailing "More" chip that opens the filter sheet on the Category section.
+
+### View toggle (`ViewToggle.tsx`)
+Segmented control: Grid / Map (and Split on `md+`).
+- Grid → existing `ActivityCard` feed
+- Map → full-height `SnapMap` with all visible seeds as pins; tapping a pin opens a compact `MapPinPreviewSheet` (image, title, ★, duration, price, distance, "View details", "Add to itinerary")
+- Split (desktop) → cards left, map right; hover/select syncs highlight on both sides via a shared `hoveredId` state.
+
+## 3. Filter bottom sheet (`FilterSheet.tsx`)
+
+Replaces inline sliders. Uses shadcn `Sheet` (side="bottom" on mobile, "right" on `md+`). Sections:
+- Trip day (Today, Tomorrow, Day 1…N derived from `home.trip` date range)
+- Time of day (Morning / Afternoon / Evening / Night)
+- Distance (Near me, Near hotel, 1 / 3 / 5 / 10 km)
+- Category (Foodie, Adventure, Culture, Nightlife, Chill, Nature, Wellness)
+- Price (Free, <$25, $25–75, $75–150, $150+)
+- Duration (<1h, 1–2h, Half day, Full day)
+- Traveller type (Solo, Couples, Friends, Family, Group)
+- Indoor / Outdoor, Accessibility, Booking required, Fits itinerary (toggles)
+- Footer: "Reset" + "Show N results"
+
+The `DiscoverFilters` type in `FilterBar.tsx` is extended; existing server-side fields (categories, tags, price band, duration, near) keep wiring through `listDiscover`. New facets (time of day, traveller type, indoor/outdoor, etc.) are applied client-side against `seed.tags` / `seed.category` until backend fields exist — no DB changes today.
+
+## 4. Activity card (`ActivityCard.tsx` refresh)
+
+Keep the file; restructure to:
+- Larger 4:5 image, category badge top-left, distance badge top-right, heart overlay (saves to backlog — calls `setActivityParked` clone path or a lightweight `saved` flag; for now reuses "Park it" so heart = park to backlog)
+- Title (display font), 1-line sensory description
+- Meta row: ★ rating · reviews · duration · `From ~$X`
+- Sub-meta: area · "Best in the morning" (derived from tags: morning/sunset/evening)
+- Two buttons: **Add to itinerary** (primary, opens add sheet) and **View details** (secondary, opens detail screen)
+
+## 5. Premium detail screen (`SeedDetailDrawer.tsx` overhaul)
+
+Switch from side Sheet to a full-screen Drawer on mobile (shadcn `Drawer`), side Sheet on `md+`:
+- Full-bleed hero image, overlay back (×) and heart buttons, "1/N" counter if multiple images
+- Below image: category eyebrow → big title → emotional subtitle
+- Meta row: ★ · reviews · duration · price · area · suitability chips
+- Sections (each a card):
+  - **Why you'll love it** — 3 bullets generated from tags + category template
+  - **What's included** — bullets (entry, suggested route, guide note, local tips)
+  - **Good to know** — best time, what to bring, weather, accessibility, suitability
+  - **Location** — embedded `SnapMap` preview pin, distance from hotel, "Open in Maps" link, "Travel time from previous itinerary item" (uses existing `computeLeg`)
+  - **Reviews** — rating summary bar + 2 sample snippets
+  - **Booking** — Booking required y/n/optional, provider, external link, status select (Not booked / Need to book / Booked), confirmation # + notes inputs
+- **Sticky bottom CTA bar**: left "★ 4.7 · 2h · ~$15", right primary **Add to itinerary**; secondary "Book activity" link when booking URL exists.
+
+The current inline "ADD TO PLAN" card is removed from the detail screen — the sticky CTA opens the new add sheet.
+
+## 6. Add-to-itinerary sheet (`AddToItinerarySheet.tsx`)
+
+New bottom sheet opened from card / detail / map preview:
+- Title: "Add to itinerary"
+- Activity summary row
+- Day selector (chips from trip date range; "Park it" first)
+- Smart time slots (Morning / Afternoon / Evening + 3 specific slot suggestions based on tags + free calendar gaps)
+- Start time + auto-computed end time (start + `est_duration_min`)
+- Travel time from previous activity (via `computeLeg`) — shown as helper text "28 min from previous stop"
+- Conflict warning if overlap with existing activity that day
+- Visibility: Just me / Share with crew
+- Attendees (multi-select from crew)
+- Booking status + link + confirmation # + notes
+- Final CTA: "Add to itinerary"
+- On success: toast + transient success card "Added to Sun 21, 8:00 AM" with **View plan / Book now / Undo**
+
+Wires to existing `addSeedToPlan` (extended to accept `start_time`, `end_time`, `booking_*`, `attendees` — already partially supported via the activity insert path).
+
+## 7. Bottom nav
+
+Reorder in `_authenticated.tsx` to: **Discover · Map · Plan · Saved · Chat**. Move Host into the hamburger menu. "Saved" routes to a new `/saved` route (lightweight list of parked activities — reuses `BacklogTray` grid layout).
+
+## 8. Copy polish
+Rewrite seed descriptions in `src/data/bali-activities.ts` to the sensory style in the brief (emerald terraces example) — short pass, no schema change.
 
 ## Files
 
 **New**
-
-- `src/routes/_authenticated/discover.tsx` — refactor existing into grid-with-filters
-- `src/routes/_authenticated/plan.tsx` — replaces `dashboard.tsx` as the planning surface
-- `src/components/discover/FilterBar.tsx`, `ActivityCard.tsx`
-- `src/components/plan/BacklogTray.tsx`, `CrewLayerToggle.tsx`
-- `src/lib/discover.functions.ts` (listSeeds, addSeedToPlan)
-- `src/lib/share.functions.ts` (subscribeToActivity, setActivityScope)
+- `src/components/discover/DiscoverHero.tsx`
+- `src/components/discover/DiscoverSearchRow.tsx`
+- `src/components/discover/CategoryRail.tsx`
+- `src/components/discover/ViewToggle.tsx`
+- `src/components/discover/FilterSheet.tsx`
+- `src/components/discover/MapPinPreviewSheet.tsx`
+- `src/components/discover/AddToItinerarySheet.tsx`
+- `src/routes/_authenticated/saved.tsx`
 
 **Modified**
+- `src/routes/_authenticated/discover.tsx` — new layout, view state, sheet wiring
+- `src/routes/_authenticated.tsx` — mobile top bar + bottom nav order + hamburger
+- `src/components/discover/ActivityCard.tsx` — richer card
+- `src/components/discover/SeedDetailDrawer.tsx` — premium detail + sticky CTA (remove inline add-to-plan)
+- `src/components/discover/FilterBar.tsx` — extend `DiscoverFilters` type, export presets reused by `FilterSheet`
+- `src/lib/discover.functions.ts` — extend `addSeedToPlan` payload (start/end time, booking, attendees), filter passthroughs where useful
+- `src/data/bali-activities.ts` — sensory copy
 
-- `src/components/dashboard/WeekCalendar.tsx` — add travel-connector lines, crew layer
-- `src/components/dashboard/SnapMap.tsx` — selected-day polyline, hover sync
-- `src/components/dashboard/ActivityDetailDrawer.tsx` — subscribe CTA, crew mini-avatars
-- `src/lib/trip.functions.ts` — wire `parked`, `scope='shared'`
-
-**Out of scope**
-
-- Onboarding redesign, avatar picker tweaks, flight/stay capture
-- Public (non-crew) sharing
-- Walking/transit modes — driving only via `computeLeg`
-
-## Validation
-
-- Manually walk Exposure → add to plan → reschedule → optimise → share → subscribe as crew member B (second browser).
-- Check calendar travel chips appear for 2+ activities on same day with coords.
+## Out of scope
+- Backend schema changes (new facets are client-side filters for now)
+- Real reviews data (uses rating/count + 2 placeholder snippets)
+- Multi-image galleries (single hero image; counter hidden when only 1 image)
+- Onboarding, host flows, payments
