@@ -191,7 +191,7 @@ function Landing() {
           <div className="mt-20 flex flex-col items-center gap-5 text-center sm:mt-24">
             <p className="font-display text-3xl sm:text-5xl">Ready when your crew is.</p>
             <Link
-              to="/login"
+              to="/plan"
               className="inline-flex h-12 items-center gap-2 rounded-full bg-accent px-8 text-sm font-medium uppercase tracking-[0.2em] text-accent-foreground transition hover:bg-accent/90"
             >
               Plan your trip <ArrowRight className="h-4 w-4" />
