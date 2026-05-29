@@ -26,6 +26,7 @@ export function SnapMap({
   avatars = [],
   focusedId,
   onPinClick,
+  routeCoords,
 }: {
   center: [number, number];
   zoom: number;
@@ -33,6 +34,7 @@ export function SnapMap({
   avatars?: SnapAvatar[];
   focusedId?: string | null;
   onPinClick?: (id: string) => void;
+  routeCoords?: [number, number][]; // [lng,lat]
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
