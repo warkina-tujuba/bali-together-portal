@@ -36,8 +36,7 @@ export const Route = createFileRoute("/plan")({
 });
 
 const STEPS: WizardStep[] = [
-  { key: "dest", label: "Destination" },
-  { key: "dates", label: "Dates" },
+  { key: "trip", label: "Trip" },
   { key: "places", label: "Places" },
   { key: "stays", label: "Stays" },
   { key: "arrival", label: "Arrival" },
@@ -74,56 +73,50 @@ function PlanWizard() {
     go(step + 1);
   };
   const back = step > 0 ? () => go(step - 1) : undefined;
-  const skip = step >= 2 ? () => (step === STEPS.length - 1 ? finishToAuth() : go(step + 1)) : undefined;
+  const skip = step >= 1 ? () => (step === STEPS.length - 1 ? finishToAuth() : go(step + 1)) : undefined;
+
+  const tripReady = !!draft.destination && !!((draft.start_date && draft.end_date) || draft.duration_days);
 
   const stepProps = (() => {
     switch (step) {
       case 0:
         return {
-          eyebrow: "Step 1 · Destination",
-          title: "Where are you going?",
-          subtitle: "A city, country, region — pick anything.",
+          eyebrow: "Step 1 · Your trip",
+          title: "Let's plan your trip",
+          subtitle: "Where are you going, and when?",
           icon: <MapPin className="h-4 w-4" />,
-          nextDisabled: !draft.destination,
+          nextDisabled: !tripReady,
         };
       case 1:
         return {
-          eyebrow: "Step 2 · Dates",
-          title: "When are you going?",
-          subtitle: "Pick exact dates, or just say how long.",
-          icon: <CalendarIcon className="h-4 w-4" />,
-          nextDisabled: !((draft.start_date && draft.end_date) || draft.duration_days),
-        };
-      case 2:
-        return {
-          eyebrow: "Step 3 · On your radar",
+          eyebrow: "Step 2 · On your radar",
           title: "Any places you want to visit?",
           subtitle: "Towns, neighbourhoods, beaches — add as many as you like.",
           icon: <Compass className="h-4 w-4" />,
           skippable: true,
           nextDisabled: false,
         };
-      case 3:
+      case 2:
         return {
-          eyebrow: "Step 4 · Stays",
+          eyebrow: "Step 3 · Stays",
           title: "Where are you staying?",
           subtitle: "Add booked stays — we'll pin them on the map for your crew.",
           icon: <HomeIcon className="h-4 w-4" />,
           skippable: true,
           nextDisabled: false,
         };
-      case 4:
+      case 3:
         return {
-          eyebrow: "Step 5 · Arrival",
+          eyebrow: "Step 4 · Arrival",
           title: "How are you arriving?",
           subtitle: "Optional — share a flight so your crew knows when you land.",
           icon: <Plane className="h-4 w-4" />,
           skippable: true,
           nextDisabled: false,
         };
-      case 5:
+      case 4:
         return {
-          eyebrow: "Step 6 · Vibe",
+          eyebrow: "Step 5 · Vibe",
           title: "What's the vibe?",
           subtitle: "Help us tailor your recommendations. Totally optional.",
           icon: <Sparkles className="h-4 w-4" />,
@@ -145,15 +138,15 @@ function PlanWizard() {
       nextLabel={step === STEPS.length - 1 ? "Save your trip" : "Next"}
       {...stepProps}
     >
-      {step === 0 && <DestinationStep />}
-      {step === 1 && <DatesStep />}
-      {step === 2 && <RadarStep />}
-      {step === 3 && <StaysStep />}
-      {step === 4 && <ArrivalStep />}
-      {step === 5 && <VibeStep />}
+      {step === 0 && <TripSearchStep />}
+      {step === 1 && <RadarStep />}
+      {step === 2 && <StaysStep />}
+      {step === 3 && <ArrivalStep />}
+      {step === 4 && <VibeStep />}
     </WizardShell>
   );
 }
+
 
 /* ---------- Steps ---------- */
 
