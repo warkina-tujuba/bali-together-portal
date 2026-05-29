@@ -143,7 +143,7 @@ function PlanSearch() {
                 <CalendarIcon className="h-5 w-5 shrink-0 text-foreground" />
               </button>
             </SheetTrigger>
-            <SheetContent side="bottom" className="rounded-t-3xl">
+            <SheetContent side="bottom" className="h-[85vh] rounded-t-3xl overflow-y-auto">
               <SheetHeader>
                 <SheetTitle>Choose your {mode === "return" ? "travel dates" : "departure date"}</SheetTitle>
               </SheetHeader>
@@ -258,7 +258,7 @@ function FieldCard({
           <MapPin className="h-5 w-5 shrink-0 text-foreground" />
         </button>
       </SheetTrigger>
-      <SheetContent side="bottom" className="rounded-t-3xl">
+      <SheetContent side="bottom" className="h-[85vh] rounded-t-3xl overflow-y-auto">
         <SheetHeader>
           <SheetTitle>{label}</SheetTitle>
         </SheetHeader>
