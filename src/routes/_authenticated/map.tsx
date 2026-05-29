@@ -294,10 +294,20 @@ function MapPage() {
         <GoogleMap center={center} zoom={zoom} pins={pins} avatars={avatars} routeCoords={routeCoords} />
       </div>
       <p className="px-2 pt-2 text-xs text-muted-foreground">
-        {selectedDay
-          ? "Showing the day's route between activities, plus bases for your selected crew layer."
-          : "Showing bases for your selected crew layer. Pick a day above to see that day's route."}
-        {" "}Live location is only visible to your trip group, and only while this page is open.
+        {selectedDay ? (
+          dayStops.length >= 2 ? (
+            <>
+              Day route: {dayStops.length} stops
+              {drivingRoute ? ` · ${Math.round(drivingRoute.totalMin)} min driving · ${drivingRoute.totalKm.toFixed(1)} km` : " · calculating driving route…"}
+              {". "}
+            </>
+          ) : (
+            <>Add at least 2 located activities to this day to see a route. </>
+          )
+        ) : (
+          <>Showing bases for your selected crew layer. Pick a day above to see that day's route. </>
+        )}
+        Live location is only visible to your trip group, and only while this page is open.
       </p>
     </div>
   );
