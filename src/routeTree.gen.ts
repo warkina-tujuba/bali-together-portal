@@ -9,10 +9,14 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as PlanRouteImport } from './routes/plan'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ChooseRouteImport } from './routes/choose'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PlanReadyRouteImport } from './routes/plan.ready'
+import { Route as PlanProfileRouteImport } from './routes/plan.profile'
+import { Route as PlanAuthRouteImport } from './routes/plan.auth'
 import { Route as AuthenticatedStartRouteImport } from './routes/_authenticated/start'
 import { Route as AuthenticatedSavedRouteImport } from './routes/_authenticated/saved'
 import { Route as AuthenticatedMapRouteImport } from './routes/_authenticated/map'
@@ -24,6 +28,11 @@ import { Route as AuthenticatedAgendaRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as ApiPublicPlacePhotoRouteImport } from './routes/api/public/place-photo'
 
+const PlanRoute = PlanRouteImport.update({
+  id: '/plan',
+  path: '/plan',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -42,6 +51,21 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const PlanReadyRoute = PlanReadyRouteImport.update({
+  id: '/ready',
+  path: '/ready',
+  getParentRoute: () => PlanRoute,
+} as any)
+const PlanProfileRoute = PlanProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => PlanRoute,
+} as any)
+const PlanAuthRoute = PlanAuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => PlanRoute,
 } as any)
 const AuthenticatedStartRoute = AuthenticatedStartRouteImport.update({
   id: '/start',
@@ -98,6 +122,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/choose': typeof ChooseRoute
   '/login': typeof LoginRoute
+  '/plan': typeof PlanRouteWithChildren
   '/admin': typeof AuthenticatedAdminRoute
   '/agenda': typeof AuthenticatedAgendaRoute
   '/chat': typeof AuthenticatedChatRoute
@@ -107,12 +132,16 @@ export interface FileRoutesByFullPath {
   '/map': typeof AuthenticatedMapRoute
   '/saved': typeof AuthenticatedSavedRoute
   '/start': typeof AuthenticatedStartRoute
+  '/plan/auth': typeof PlanAuthRoute
+  '/plan/profile': typeof PlanProfileRoute
+  '/plan/ready': typeof PlanReadyRoute
   '/api/public/place-photo': typeof ApiPublicPlacePhotoRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/choose': typeof ChooseRoute
   '/login': typeof LoginRoute
+  '/plan': typeof PlanRouteWithChildren
   '/admin': typeof AuthenticatedAdminRoute
   '/agenda': typeof AuthenticatedAgendaRoute
   '/chat': typeof AuthenticatedChatRoute
@@ -122,6 +151,9 @@ export interface FileRoutesByTo {
   '/map': typeof AuthenticatedMapRoute
   '/saved': typeof AuthenticatedSavedRoute
   '/start': typeof AuthenticatedStartRoute
+  '/plan/auth': typeof PlanAuthRoute
+  '/plan/profile': typeof PlanProfileRoute
+  '/plan/ready': typeof PlanReadyRoute
   '/api/public/place-photo': typeof ApiPublicPlacePhotoRoute
 }
 export interface FileRoutesById {
@@ -130,6 +162,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/choose': typeof ChooseRoute
   '/login': typeof LoginRoute
+  '/plan': typeof PlanRouteWithChildren
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/agenda': typeof AuthenticatedAgendaRoute
   '/_authenticated/chat': typeof AuthenticatedChatRoute
@@ -139,6 +172,9 @@ export interface FileRoutesById {
   '/_authenticated/map': typeof AuthenticatedMapRoute
   '/_authenticated/saved': typeof AuthenticatedSavedRoute
   '/_authenticated/start': typeof AuthenticatedStartRoute
+  '/plan/auth': typeof PlanAuthRoute
+  '/plan/profile': typeof PlanProfileRoute
+  '/plan/ready': typeof PlanReadyRoute
   '/api/public/place-photo': typeof ApiPublicPlacePhotoRoute
 }
 export interface FileRouteTypes {
@@ -147,6 +183,7 @@ export interface FileRouteTypes {
     | '/'
     | '/choose'
     | '/login'
+    | '/plan'
     | '/admin'
     | '/agenda'
     | '/chat'
@@ -156,12 +193,16 @@ export interface FileRouteTypes {
     | '/map'
     | '/saved'
     | '/start'
+    | '/plan/auth'
+    | '/plan/profile'
+    | '/plan/ready'
     | '/api/public/place-photo'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/choose'
     | '/login'
+    | '/plan'
     | '/admin'
     | '/agenda'
     | '/chat'
@@ -171,6 +212,9 @@ export interface FileRouteTypes {
     | '/map'
     | '/saved'
     | '/start'
+    | '/plan/auth'
+    | '/plan/profile'
+    | '/plan/ready'
     | '/api/public/place-photo'
   id:
     | '__root__'
@@ -178,6 +222,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/choose'
     | '/login'
+    | '/plan'
     | '/_authenticated/admin'
     | '/_authenticated/agenda'
     | '/_authenticated/chat'
@@ -187,6 +232,9 @@ export interface FileRouteTypes {
     | '/_authenticated/map'
     | '/_authenticated/saved'
     | '/_authenticated/start'
+    | '/plan/auth'
+    | '/plan/profile'
+    | '/plan/ready'
     | '/api/public/place-photo'
   fileRoutesById: FileRoutesById
 }
@@ -195,11 +243,19 @@ export interface RootRouteChildren {
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   ChooseRoute: typeof ChooseRoute
   LoginRoute: typeof LoginRoute
+  PlanRoute: typeof PlanRouteWithChildren
   ApiPublicPlacePhotoRoute: typeof ApiPublicPlacePhotoRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/plan': {
+      id: '/plan'
+      path: '/plan'
+      fullPath: '/plan'
+      preLoaderRoute: typeof PlanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -227,6 +283,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/plan/ready': {
+      id: '/plan/ready'
+      path: '/ready'
+      fullPath: '/plan/ready'
+      preLoaderRoute: typeof PlanReadyRouteImport
+      parentRoute: typeof PlanRoute
+    }
+    '/plan/profile': {
+      id: '/plan/profile'
+      path: '/profile'
+      fullPath: '/plan/profile'
+      preLoaderRoute: typeof PlanProfileRouteImport
+      parentRoute: typeof PlanRoute
+    }
+    '/plan/auth': {
+      id: '/plan/auth'
+      path: '/auth'
+      fullPath: '/plan/auth'
+      preLoaderRoute: typeof PlanAuthRouteImport
+      parentRoute: typeof PlanRoute
     }
     '/_authenticated/start': {
       id: '/_authenticated/start'
@@ -329,11 +406,26 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
   AuthenticatedRouteChildren,
 )
 
+interface PlanRouteChildren {
+  PlanAuthRoute: typeof PlanAuthRoute
+  PlanProfileRoute: typeof PlanProfileRoute
+  PlanReadyRoute: typeof PlanReadyRoute
+}
+
+const PlanRouteChildren: PlanRouteChildren = {
+  PlanAuthRoute: PlanAuthRoute,
+  PlanProfileRoute: PlanProfileRoute,
+  PlanReadyRoute: PlanReadyRoute,
+}
+
+const PlanRouteWithChildren = PlanRoute._addFileChildren(PlanRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   ChooseRoute: ChooseRoute,
   LoginRoute: LoginRoute,
+  PlanRoute: PlanRouteWithChildren,
   ApiPublicPlacePhotoRoute: ApiPublicPlacePhotoRoute,
 }
 export const routeTree = rootRouteImport
