@@ -27,8 +27,8 @@ function LoginPage() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) {
-        if (invite) navigate({ to: "/start", search: { invite } });
-        else navigate({ to: "/choose" });
+        if (invite) navigate({ to: "/plan", search: { invite } });
+        else navigate({ to: "/plan" });
       }
     });
   }, [navigate, invite]);
