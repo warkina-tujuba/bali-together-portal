@@ -265,7 +265,7 @@ function Dashboard() {
       <Card className="rounded-3xl border-0 p-7 shadow-card">
         <h2 className="font-display text-3xl">No trip yet</h2>
         <p className="mt-2 text-muted-foreground">Start a new trip or paste a magic link.</p>
-        <Link to="/choose" className="mt-5 inline-block rounded-full bg-primary px-5 py-2.5 text-sm text-primary-foreground">Get started</Link>
+        <Link to="/plan" className="mt-5 inline-block rounded-full bg-primary px-5 py-2.5 text-sm text-primary-foreground">Get started</Link>
       </Card>
     </div>
   );
