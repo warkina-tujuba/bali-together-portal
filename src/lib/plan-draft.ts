@@ -79,6 +79,6 @@ export const usePlanDraft = create<Store>()(
       patch: (p) => set(p),
       reset: () => set({ ...initial }),
     }),
-    { name: "tl:plan:draft:v1" },
+    { name: "tl:plan:draft:v2" },
   ),
 );
