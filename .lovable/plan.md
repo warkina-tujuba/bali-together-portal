@@ -1,138 +1,157 @@
+# Google Maps Platform Migration — Phased Plan
 
-# Discover page redesign — mobile-first
+Massive scope. Splitting into 5 phases so each is reviewable and shippable. Phase 1 must land before any UI changes.
 
-Reuses existing data, "Near me" geolocation, map (SnapMap), heart/save behaviour, and itinerary functions. No backend or schema changes; all work is in frontend components on `/discover` plus the activity detail drawer.
+## Decisions made for you
+- **Server key**: `GOOGLE_MAPS_SERVER_API_KEY` — saved as runtime secret ✅
+- **Browser key**: Lovable blocks user-defined `VITE_*` secrets. Since the browser key is referrer-restricted (safe to embed, same pattern as current `MAPBOX_TOKEN`), I'll create `src/lib/google-maps.ts` with the key as a `const`. You paste it once when you review Phase 2. If you'd rather, you can add it as a non-VITE secret (`GOOGLE_MAPS_BROWSER_API_KEY`) and I'll wire it via a small `/api/public/maps-config` route — slower, more roundtrips.
+- **No connector**: per your choice. You manage referrer allowlists in Google Cloud Console (include `*.lovable.app`, `warkina.com`, `*.warkina.com`).
 
-## 1. Mobile top bar (replaces big "Travel Link / Sign out" header)
+---
 
-Update `src/routes/_authenticated.tsx` mobile header to:
-- Left: hamburger (opens a Sheet with: Profile, My plan, Saved, Host mode, Sign out)
-- Centre: "Travel Link" wordmark
-- Right: search icon (focuses hero search) + avatar
-- Hide "Sign out" from the top bar; it moves into the hamburger sheet.
+## Phase 1 — Data model & server foundation
 
-Desktop keeps the existing header.
+**Migration** (`supabase--migration`):
 
-## 2. New `/discover` layout (mobile order)
+```sql
+ALTER TABLE public.activities ADD COLUMN
+  google_place_id text,
+  google_maps_url text,
+  cached_google_rating numeric,
+  cached_google_review_count integer,
+  cached_google_reviews jsonb,
+  cached_google_photo_url text,
+  cached_google_address text,
+  cached_google_opening_hours jsonb,
+  cached_google_website_url text,
+  google_data_last_refreshed_at timestamptz;
 
+ALTER TABLE public.activity_seeds ADD COLUMN
+  google_place_id text,
+  google_maps_url text,
+  cached_google_rating numeric,
+  cached_google_review_count integer,
+  cached_google_reviews jsonb,
+  cached_google_photo_url text,
+  cached_google_address text,
+  cached_google_opening_hours jsonb,
+  cached_google_website_url text,
+  google_data_last_refreshed_at timestamptz;
+
+ALTER TABLE public.accommodations ADD COLUMN
+  google_place_id text,
+  google_maps_url text;
+
+ALTER TABLE public.activities ADD COLUMN
+  booking_status text DEFAULT 'not_booked'
+    CHECK (booking_status IN ('not_booked','need_to_book','booked')),
+  confirmation_number text,
+  travel_time_from_previous integer,
+  distance_from_previous numeric,
+  end_time_override time;
+
+-- Flights: add manual-entry fields
+ALTER TABLE public.flights ADD COLUMN
+  booking_reference text,
+  notes text,
+  origin_airport_place_id text,
+  destination_airport_place_id text;
+
+CREATE INDEX IF NOT EXISTS idx_activities_google_place_id ON public.activities(google_place_id);
+CREATE INDEX IF NOT EXISTS idx_activity_seeds_google_place_id ON public.activity_seeds(google_place_id);
 ```
-[ Mobile top bar ]
-[ Hero card — "Discover Bali" w/ overlay + quick chips ]
-[ Search row: input · Near me · Filters · Map ]
-[ Horizontal-scroll category chip rail ]
-[ View toggle: Grid | Map  (mobile) / Grid | Map | Split (≥md) ]
-[ Activity card feed  OR  full-bleed map ]
-[ Bottom nav ]
-```
 
-Removes the tall "FIND YOUR TRIP / Discover / Tap a card…" block and the inline sliders. Intro copy folds into the hero subtitle.
+Existing `route_legs` table already supports route caching — reused.
 
-### Hero card (`DiscoverHero.tsx`)
-- Large rounded image (use destination cover from `home.trip` if available, else a Bali fallback in `src/assets`)
-- Overlay gradient + title "Discover Bali" / subtitle "Find experiences that fit your itinerary"
-- Quick chips: **Near me**, **Today**, **Must do** — each toggles the matching filter and scrolls to results.
+**New server files** (all under `src/lib/`, server key only):
+- `src/lib/google-maps.server.ts` — fetch helpers: `placeDetails(placeId, fields)`, `placeAutocomplete(input, sessionToken)`, `placeSearchText(q)`, `computeRoute({origin,destination,mode})`, `geocode(address)`, `placePhoto(name, maxWidth)`.
+  - All call `https://places.googleapis.com/v1/...`, `https://routes.googleapis.com/...`, `https://maps.googleapis.com/maps/api/geocode/json`.
+  - Header: `X-Goog-Api-Key: process.env.GOOGLE_MAPS_SERVER_API_KEY` + `X-Goog-FieldMask`.
+- `src/lib/places.functions.ts` (`createServerFn`):
+  - `getPlaceDetails({ placeId, level: 'card'|'detail' })` — checks cache first, refreshes if stale per your TTLs (rating/reviews/photos 7d, address/coords 30d, hours 24h).
+  - `refreshActivityGoogleData({ activityId })` — admin/manual refresh.
+  - `searchPlacesAutocomplete({ input, sessionToken, types? })` — proxied through server (keeps server key safe; also enables consistent typing).
+  - `searchPlacesByText({ query, locationBias? })`.
+- `src/lib/routes.functions.ts`:
+  - `computeLeg({ origin, dest, mode })` — already exists for Mapbox; rewrite to call Routes API; persist to `route_legs` cache.
+  - `optimizeDayRoute({ trip_id, day_date })` — uses Route Optimization API.
 
-### Search row (`DiscoverSearchRow.tsx`)
-Compact pill input + 3 icon buttons (Near me, Filters, Map). Replaces today's search+Near me only.
+**Note**: All new server fns use `requireSupabaseAuth`. Field masks are mandatory (cost control).
 
-### Category rail
-Refactor existing `FilterBar` chips into `CategoryRail.tsx` — single-row horizontally scrollable (snap-x, hidden scrollbar). Same chip list the spec calls for, plus a trailing "More" chip that opens the filter sheet on the Category section.
+---
 
-### View toggle (`ViewToggle.tsx`)
-Segmented control: Grid / Map (and Split on `md+`).
-- Grid → existing `ActivityCard` feed
-- Map → full-height `SnapMap` with all visible seeds as pins; tapping a pin opens a compact `MapPinPreviewSheet` (image, title, ★, duration, price, distance, "View details", "Add to itinerary")
-- Split (desktop) → cards left, map right; hover/select syncs highlight on both sides via a shared `hoveredId` state.
+## Phase 2 — Google Maps rendering
 
-## 3. Filter bottom sheet (`FilterSheet.tsx`)
+- Add `src/lib/google-maps.ts` with `GOOGLE_MAPS_BROWSER_API_KEY` constant (you paste the key here).
+- New `src/components/maps/GoogleMap.tsx`:
+  - Loads `https://maps.googleapis.com/maps/api/js?key=...&libraries=places,marker&loading=async&callback=__initGmap`.
+  - Singleton loader so the script only loads once.
+  - Props mirror current `SnapMap.tsx`: `center`, `zoom`, `pins`, `avatars`, `focusedId`, `onPinClick`, `routeCoords`.
+  - Uses `google.maps.Marker` (NOT AdvancedMarkerElement — no mapId).
+  - Pins styled by category via custom icon (SVG circle with emoji label, matching current Mapbox style).
+  - Polyline for route via `google.maps.Polyline`.
+  - Graceful fallback `<div>` with "Map unavailable" if script load fails.
+- Replace usages of `SnapMap`/`ItineraryMap` with `GoogleMap`. Keep old Mapbox files until Phase 5 cleanup.
 
-Replaces inline sliders. Uses shadcn `Sheet` (side="bottom" on mobile, "right" on `md+`). Sections:
-- Trip day (Today, Tomorrow, Day 1…N derived from `home.trip` date range)
-- Time of day (Morning / Afternoon / Evening / Night)
-- Distance (Near me, Near hotel, 1 / 3 / 5 / 10 km)
-- Category (Foodie, Adventure, Culture, Nightlife, Chill, Nature, Wellness)
-- Price (Free, <$25, $25–75, $75–150, $150+)
-- Duration (<1h, 1–2h, Half day, Full day)
-- Traveller type (Solo, Couples, Friends, Family, Group)
-- Indoor / Outdoor, Accessibility, Booking required, Fits itinerary (toggles)
-- Footer: "Reset" + "Show N results"
+---
 
-The `DiscoverFilters` type in `FilterBar.tsx` is extended; existing server-side fields (categories, tags, price band, duration, near) keep wiring through `listDiscover`. New facets (time of day, traveller type, indoor/outdoor, etc.) are applied client-side against `seed.tags` / `seed.category` until backend fields exist — no DB changes today.
+## Phase 3 — Discovery, Map tab, Activity Detail rewire
 
-## 4. Activity card (`ActivityCard.tsx` refresh)
+**Discovery** (`src/routes/_authenticated/discover.tsx`):
+- Card data: read `cached_google_rating`, `cached_google_review_count`, `cached_google_photo_url` from `activity_seeds`. Hide rows when null.
+- Map view toggle uses new `GoogleMap`.
+- Search bar: add Places Autocomplete (server-proxied) for places/landmarks — selecting recenters map + filters by distance.
+- Near me: browser geolocation → distance sort, falls back to accommodation.
 
-Keep the file; restructure to:
-- Larger 4:5 image, category badge top-left, distance badge top-right, heart overlay (saves to backlog — calls `setActivityParked` clone path or a lightweight `saved` flag; for now reuses "Park it" so heart = park to backlog)
-- Title (display font), 1-line sensory description
-- Meta row: ★ rating · reviews · duration · `From ~$X`
-- Sub-meta: area · "Best in the morning" (derived from tags: morning/sunset/evening)
-- Two buttons: **Add to itinerary** (primary, opens add sheet) and **View details** (secondary, opens detail screen)
+**Map tab** (`src/routes/_authenticated/map.tsx`): swap Mapbox for `GoogleMap`. Mobile pin tap → existing `MapPinPreviewSheet`.
 
-## 5. Premium detail screen (`SeedDetailDrawer.tsx` overhaul)
+**Activity detail** (`SeedDetailDrawer.tsx`):
+- New sections: Why you'll love it / What's included / Good to know / Location (embedded `GoogleMap` mini) / Reviews / Booking.
+- On open: call `getPlaceDetails({ level: 'detail' })` once; render rating, reviews snippets (3–5), opening hours, photos, Google Maps link.
+- Sticky bottom CTA already exists — keep, add "Book activity" when `booking_url` set.
 
-Switch from side Sheet to a full-screen Drawer on mobile (shadcn `Drawer`), side Sheet on `md+`:
-- Full-bleed hero image, overlay back (×) and heart buttons, "1/N" counter if multiple images
-- Below image: category eyebrow → big title → emotional subtitle
-- Meta row: ★ · reviews · duration · price · area · suitability chips
-- Sections (each a card):
-  - **Why you'll love it** — 3 bullets generated from tags + category template
-  - **What's included** — bullets (entry, suggested route, guide note, local tips)
-  - **Good to know** — best time, what to bring, weather, accessibility, suitability
-  - **Location** — embedded `SnapMap` preview pin, distance from hotel, "Open in Maps" link, "Travel time from previous itinerary item" (uses existing `computeLeg`)
-  - **Reviews** — rating summary bar + 2 sample snippets
-  - **Booking** — Booking required y/n/optional, provider, external link, status select (Not booked / Need to book / Booked), confirmation # + notes inputs
-- **Sticky bottom CTA bar**: left "★ 4.7 · 2h · ~$15", right primary **Add to itinerary**; secondary "Book activity" link when booking URL exists.
+**Add to itinerary sheet** (`AddToItinerarySheet.tsx`):
+- Already shipped. Wire `computeLeg` (Routes API) when day/time selected → show "28 min from your accommodation" and conflict warning.
 
-The current inline "ADD TO PLAN" card is removed from the detail screen — the sticky CTA opens the new add sheet.
+---
 
-## 6. Add-to-itinerary sheet (`AddToItinerarySheet.tsx`)
+## Phase 4 — Accommodation, Admin helper, Flights
 
-New bottom sheet opened from card / detail / map preview:
-- Title: "Add to itinerary"
-- Activity summary row
-- Day selector (chips from trip date range; "Park it" first)
-- Smart time slots (Morning / Afternoon / Evening + 3 specific slot suggestions based on tags + free calendar gaps)
-- Start time + auto-computed end time (start + `est_duration_min`)
-- Travel time from previous activity (via `computeLeg`) — shown as helper text "28 min from previous stop"
-- Conflict warning if overlap with existing activity that day
-- Visibility: Just me / Share with crew
-- Attendees (multi-select from crew)
-- Booking status + link + confirmation # + notes
-- Final CTA: "Add to itinerary"
-- On success: toast + transient success card "Added to Sun 21, 8:00 AM" with **View plan / Book now / Undo**
+- **Accommodation search**: replace `PlaceAutocomplete.tsx` (Mapbox geocoder) with new `GooglePlaceAutocomplete.tsx` using server-proxied `searchPlacesAutocomplete`. Save place_id, name, address, lat/lng, maps URL.
+- **Admin Place ID helper** at `/admin`: per activity, search → pick → save → "Refresh Google data" button.
+- **Flights**: add manual entry form using Google Places autocomplete for airports (types: `airport`). No third-party flight API.
 
-Wires to existing `addSeedToPlan` (extended to accept `start_time`, `end_time`, `booking_*`, `attendees` — already partially supported via the activity insert path).
+---
 
-## 7. Bottom nav
+## Phase 5 — Mapbox removal + QA
 
-Reorder in `_authenticated.tsx` to: **Discover · Map · Plan · Saved · Chat**. Move Host into the hamburger menu. "Saved" routes to a new `/saved` route (lightweight list of parked activities — reuses `BacklogTray` grid layout).
+After verifying Phases 2–4 visually:
+- Remove `src/components/dashboard/SnapMap.tsx`, `ItineraryMap.tsx`, `src/lib/mapbox.ts`, `src/components/trip/PlaceAutocomplete.tsx`, `StaySearchForm.tsx` Mapbox calls.
+- `bun remove mapbox-gl`.
+- Audit imports.
 
-## 8. Copy polish
-Rewrite seed descriptions in `src/data/bali-activities.ts` to the sensory style in the brief (emerald terraces example) — short pass, no schema change.
+---
 
-## Files
+## Caching strategy (Phase 1 helper)
+`getPlaceDetails` reads `google_data_last_refreshed_at`. If null OR older than the smallest relevant TTL for the requested fields, re-fetch and update row. `route_legs` cache: hour-bucketed (existing schema).
 
-**New**
-- `src/components/discover/DiscoverHero.tsx`
-- `src/components/discover/DiscoverSearchRow.tsx`
-- `src/components/discover/CategoryRail.tsx`
-- `src/components/discover/ViewToggle.tsx`
-- `src/components/discover/FilterSheet.tsx`
-- `src/components/discover/MapPinPreviewSheet.tsx`
-- `src/components/discover/AddToItinerarySheet.tsx`
-- `src/routes/_authenticated/saved.tsx`
+## Error handling
+Every server fn returns `{ data, error: string|null }` shape. Components hide Google-dependent UI on null. Map renders fallback box on script load failure.
 
-**Modified**
-- `src/routes/_authenticated/discover.tsx` — new layout, view state, sheet wiring
-- `src/routes/_authenticated.tsx` — mobile top bar + bottom nav order + hamburger
-- `src/components/discover/ActivityCard.tsx` — richer card
-- `src/components/discover/SeedDetailDrawer.tsx` — premium detail + sticky CTA (remove inline add-to-plan)
-- `src/components/discover/FilterBar.tsx` — extend `DiscoverFilters` type, export presets reused by `FilterSheet`
-- `src/lib/discover.functions.ts` — extend `addSeedToPlan` payload (start/end time, booking, attendees), filter passthroughs where useful
-- `src/data/bali-activities.ts` — sensory copy
+## Out of scope (per your spec)
+- Onboarding flow changes
+- Third-party flight API
+- Mapbox-equivalent live-location avatar pulse (will be re-implemented atop GoogleMap in Phase 2)
 
-## Out of scope
-- Backend schema changes (new facets are client-side filters for now)
-- Real reviews data (uses rating/count + 2 placeholder snippets)
-- Multi-image galleries (single hero image; counter hidden when only 1 image)
-- Onboarding, host flows, payments
+---
+
+## Acceptance checkpoints
+- After Phase 1: server fns callable, migration applied, no UI change.
+- After Phase 2: maps render in all 3 places, no console errors.
+- After Phase 3: cards show ratings, detail drawer shows reviews/map/hours.
+- After Phase 4: accommodation autocomplete works, admin can attach place IDs.
+- After Phase 5: zero mapbox-gl imports.
+
+**Estimated files touched**: ~30 (Phase 1: migration + 3 files; Phase 2: 1 new + 3 replacements; Phase 3: 4 routes/components; Phase 4: 3 new + 2 modified; Phase 5: 5 deletions).
+
+Approve and I'll execute Phase 1 immediately, then pause for the browser key before Phase 2.
