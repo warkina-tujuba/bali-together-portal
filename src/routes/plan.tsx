@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { useState, useMemo, useEffect } from "react";
 import { z } from "zod";
-import { format, differenceInCalendarDays } from "date-fns";
+import { format, differenceInCalendarDays, parseISO } from "date-fns";
 import { MapPin, CalendarIcon, Minus, Plus, Search, Info } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 import { Calendar } from "@/components/ui/calendar";
