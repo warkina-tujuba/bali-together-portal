@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ActivityPlaceIdHelper } from "@/components/admin/ActivityPlaceIdHelper";
 
 export const Route = createFileRoute("/_authenticated/admin")({ component: Admin });
 
@@ -92,6 +93,8 @@ function Admin() {
           ))}
         </ul>
       </Card>
+
+      <ActivityPlaceIdHelper />
     </main>
   );
 }

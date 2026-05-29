@@ -123,6 +123,8 @@ export const saveAccommodation = createServerFn({ method: "POST" })
     check_in: z.string().max(20).optional().nullable(),
     check_out: z.string().max(20).optional().nullable(),
     place_id: z.string().max(200).optional().nullable(),
+    google_place_id: z.string().max(200).optional().nullable(),
+    google_maps_url: z.string().url().max(500).optional().nullable(),
     booking_source: z.string().max(40).optional().nullable(),
     booking_url: z.string().url().max(800).optional().nullable(),
   }))
@@ -381,6 +383,30 @@ export const setTripWhatsApp = createServerFn({ method: "POST" })
     const { data: trip } = await supabaseAdmin.from("trips").select("id").eq("is_active", true).limit(1).maybeSingle();
     if (!trip) throw new Error("No active trip");
     const { error } = await supabaseAdmin.from("trips").update({ whatsapp_invite_url: data.whatsapp_invite_url }).eq("id", trip.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const adminListActivities = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data: role } = await supabaseAdmin.from("user_roles").select("role").eq("user_id", context.userId).eq("role", "admin").maybeSingle();
+    if (!role) throw new Error("Forbidden");
+    const { data: activities } = await supabaseAdmin
+      .from("activities")
+      .select("id, title, location, day_date, google_place_id, google_data_last_refreshed_at, cached_google_rating")
+      .order("day_date", { ascending: true })
+      .order("sort_index", { ascending: true });
+    return { activities: activities ?? [] };
+  });
+
+export const adminAttachActivityPlaceId = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({ activityId: z.string().uuid(), placeId: z.string().min(1).max(200) }))
+  .handler(async ({ data, context }) => {
+    const { data: role } = await supabaseAdmin.from("user_roles").select("role").eq("user_id", context.userId).eq("role", "admin").maybeSingle();
+    if (!role) throw new Error("Forbidden");
+    const { error } = await supabaseAdmin.from("activities").update({ google_place_id: data.placeId }).eq("id", data.activityId);
     if (error) throw new Error(error.message);
     return { ok: true };
   });

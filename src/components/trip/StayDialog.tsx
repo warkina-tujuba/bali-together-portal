@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
-import { saveAccommodation, geocode } from "@/lib/trip.functions";
+import { saveAccommodation } from "@/lib/trip.functions";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,14 +9,16 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { BOOKING_SOURCES, bookingSourceMeta } from "@/lib/booking-source";
 import { cn } from "@/lib/utils";
+import { PlaceAutocomplete, type PlaceHit } from "@/components/trip/PlaceAutocomplete";
 
-type Picked = { name: string; address: string; lat: number; lng: number; place_id: string };
 type Initial = {
   name?: string | null;
   address?: string | null;
   lat?: number | null;
   lng?: number | null;
   place_id?: string | null;
+  google_place_id?: string | null;
+  google_maps_url?: string | null;
   check_in?: string | null;
   check_out?: string | null;
   booking_source?: string | null;
@@ -26,14 +28,11 @@ type Initial = {
 export function StayDialog({ trigger, initial }: { trigger: React.ReactNode; initial?: Initial }) {
   const [open, setOpen] = useState(false);
   const saveFn = useServerFn(saveAccommodation);
-  const geoFn = useServerFn(geocode);
   const qc = useQueryClient();
 
-  const [q, setQ] = useState(initial?.name ?? "");
-  const [results, setResults] = useState<Picked[]>([]);
-  const [picked, setPicked] = useState<Picked | null>(
+  const [picked, setPicked] = useState<PlaceHit | null>(
     initial?.name && initial?.lat != null && initial?.lng != null
-      ? { name: initial.name, address: initial.address ?? "", lat: initial.lat, lng: initial.lng, place_id: initial.place_id ?? "" }
+      ? { name: initial.name, address: initial.address ?? "", lat: initial.lat, lng: initial.lng, place_id: initial.google_place_id ?? initial.place_id ?? "" }
       : null,
   );
   const [check_in, setCheckIn] = useState(initial?.check_in ?? "");
@@ -41,14 +40,6 @@ export function StayDialog({ trigger, initial }: { trigger: React.ReactNode; ini
   const [booking_source, setSource] = useState(initial?.booking_source ?? "");
   const [booking_url, setUrl] = useState(initial?.booking_url ?? "");
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (q.length < 3 || picked) { setResults([]); return; }
-    const t = setTimeout(async () => {
-      try { const r = await geoFn({ data: { q } }); setResults(r.results); } catch { /* ignore */ }
-    }, 350);
-    return () => clearTimeout(t);
-  }, [q, picked, geoFn]);
 
   async function submit() {
     if (!picked) return;
@@ -61,6 +52,10 @@ export function StayDialog({ trigger, initial }: { trigger: React.ReactNode; ini
           lat: picked.lat,
           lng: picked.lng,
           place_id: picked.place_id || null,
+          google_place_id: picked.place_id || null,
+          google_maps_url: picked.place_id
+            ? `https://www.google.com/maps/place/?q=place_id:${picked.place_id}`
+            : null,
           check_in: check_in || null,
           check_out: check_out || null,
           booking_source: booking_source || null,
@@ -89,31 +84,12 @@ export function StayDialog({ trigger, initial }: { trigger: React.ReactNode; ini
         </DialogHeader>
         <div className="space-y-3">
           <Field label="Property">
-            <Input
-              value={q}
-              onChange={(e) => { setQ(e.target.value); setPicked(null); }}
-              placeholder="e.g. Bambu Indah Ubud"
-              className="h-11 rounded-xl"
+            <PlaceAutocomplete
+              value={picked}
+              onPick={setPicked}
+              placeholder="Hotel, villa, or address"
             />
           </Field>
-          {!picked && results.length > 0 && (
-            <ul className="max-h-48 overflow-auto rounded-xl border border-border bg-card">
-              {results.map((r) => (
-                <li key={r.place_id}>
-                  <button onClick={() => { setPicked(r); setResults([]); setQ(r.name); }} className="w-full px-3 py-2 text-left hover:bg-secondary">
-                    <p className="text-sm font-medium">{r.name}</p>
-                    <p className="line-clamp-1 text-xs text-muted-foreground">{r.address}</p>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-          {picked && (
-            <div className="rounded-xl bg-secondary p-3">
-              <p className="text-sm font-medium">{picked.name}</p>
-              <p className="text-xs text-muted-foreground">{picked.address}</p>
-            </div>
-          )}
 
           <Field label="Booked through">
             <div className="flex flex-wrap gap-2">
