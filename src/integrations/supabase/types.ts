@@ -22,6 +22,8 @@ export type Database = {
           check_in: string | null
           check_out: string | null
           created_at: string
+          google_maps_url: string | null
+          google_place_id: string | null
           id: string
           kind: Database["public"]["Enums"]["stay_kind"]
           lat: number | null
@@ -40,6 +42,8 @@ export type Database = {
           check_in?: string | null
           check_out?: string | null
           created_at?: string
+          google_maps_url?: string | null
+          google_place_id?: string | null
           id?: string
           kind?: Database["public"]["Enums"]["stay_kind"]
           lat?: number | null
@@ -58,6 +62,8 @@ export type Database = {
           check_in?: string | null
           check_out?: string | null
           created_at?: string
+          google_maps_url?: string | null
+          google_place_id?: string | null
           id?: string
           kind?: Database["public"]["Enums"]["stay_kind"]
           lat?: number | null
@@ -81,16 +87,29 @@ export type Database = {
       }
       activities: {
         Row: {
+          booking_status: string
           booking_url: string | null
+          cached_google_address: string | null
+          cached_google_opening_hours: Json | null
+          cached_google_photo_url: string | null
+          cached_google_rating: number | null
+          cached_google_review_count: number | null
+          cached_google_reviews: Json | null
+          cached_google_website_url: string | null
           category: Database["public"]["Enums"]["event_category"]
+          confirmation_number: string | null
           cost_usd: number | null
           cover_image_url: string | null
           created_at: string
           created_by: string | null
           day_date: string
           description: string | null
+          distance_from_previous: number | null
           duration_min: number | null
           end_time: string | null
+          google_data_last_refreshed_at: string | null
+          google_maps_url: string | null
+          google_place_id: string | null
           id: string
           image_url: string | null
           is_host_event: boolean
@@ -108,20 +127,34 @@ export type Database = {
           start_time: string | null
           tags: string[] | null
           title: string
+          travel_time_from_previous: number | null
           trip_id: string
           website_url: string | null
         }
         Insert: {
+          booking_status?: string
           booking_url?: string | null
+          cached_google_address?: string | null
+          cached_google_opening_hours?: Json | null
+          cached_google_photo_url?: string | null
+          cached_google_rating?: number | null
+          cached_google_review_count?: number | null
+          cached_google_reviews?: Json | null
+          cached_google_website_url?: string | null
           category?: Database["public"]["Enums"]["event_category"]
+          confirmation_number?: string | null
           cost_usd?: number | null
           cover_image_url?: string | null
           created_at?: string
           created_by?: string | null
           day_date: string
           description?: string | null
+          distance_from_previous?: number | null
           duration_min?: number | null
           end_time?: string | null
+          google_data_last_refreshed_at?: string | null
+          google_maps_url?: string | null
+          google_place_id?: string | null
           id?: string
           image_url?: string | null
           is_host_event?: boolean
@@ -139,20 +172,34 @@ export type Database = {
           start_time?: string | null
           tags?: string[] | null
           title: string
+          travel_time_from_previous?: number | null
           trip_id: string
           website_url?: string | null
         }
         Update: {
+          booking_status?: string
           booking_url?: string | null
+          cached_google_address?: string | null
+          cached_google_opening_hours?: Json | null
+          cached_google_photo_url?: string | null
+          cached_google_rating?: number | null
+          cached_google_review_count?: number | null
+          cached_google_reviews?: Json | null
+          cached_google_website_url?: string | null
           category?: Database["public"]["Enums"]["event_category"]
+          confirmation_number?: string | null
           cost_usd?: number | null
           cover_image_url?: string | null
           created_at?: string
           created_by?: string | null
           day_date?: string
           description?: string | null
+          distance_from_previous?: number | null
           duration_min?: number | null
           end_time?: string | null
+          google_data_last_refreshed_at?: string | null
+          google_maps_url?: string | null
+          google_place_id?: string | null
           id?: string
           image_url?: string | null
           is_host_event?: boolean
@@ -170,6 +217,7 @@ export type Database = {
           start_time?: string | null
           tags?: string[] | null
           title?: string
+          travel_time_from_previous?: number | null
           trip_id?: string
           website_url?: string | null
         }
@@ -192,12 +240,22 @@ export type Database = {
       }
       activity_seeds: {
         Row: {
+          cached_google_address: string | null
+          cached_google_opening_hours: Json | null
+          cached_google_photo_url: string | null
+          cached_google_rating: number | null
+          cached_google_review_count: number | null
+          cached_google_reviews: Json | null
+          cached_google_website_url: string | null
           category: string
           created_at: string
           description: string | null
           destination_slug: string
           est_cost_usd: number | null
           est_duration_min: number | null
+          google_data_last_refreshed_at: string | null
+          google_maps_url: string | null
+          google_place_id: string | null
           id: string
           image_url: string | null
           lat: number | null
@@ -210,12 +268,22 @@ export type Database = {
           url: string | null
         }
         Insert: {
+          cached_google_address?: string | null
+          cached_google_opening_hours?: Json | null
+          cached_google_photo_url?: string | null
+          cached_google_rating?: number | null
+          cached_google_review_count?: number | null
+          cached_google_reviews?: Json | null
+          cached_google_website_url?: string | null
           category?: string
           created_at?: string
           description?: string | null
           destination_slug: string
           est_cost_usd?: number | null
           est_duration_min?: number | null
+          google_data_last_refreshed_at?: string | null
+          google_maps_url?: string | null
+          google_place_id?: string | null
           id?: string
           image_url?: string | null
           lat?: number | null
@@ -228,12 +296,22 @@ export type Database = {
           url?: string | null
         }
         Update: {
+          cached_google_address?: string | null
+          cached_google_opening_hours?: Json | null
+          cached_google_photo_url?: string | null
+          cached_google_rating?: number | null
+          cached_google_review_count?: number | null
+          cached_google_reviews?: Json | null
+          cached_google_website_url?: string | null
           category?: string
           created_at?: string
           description?: string | null
           destination_slug?: string
           est_cost_usd?: number | null
           est_duration_min?: number | null
+          google_data_last_refreshed_at?: string | null
+          google_maps_url?: string | null
+          google_place_id?: string | null
           id?: string
           image_url?: string | null
           lat?: number | null
@@ -372,12 +450,16 @@ export type Database = {
         Row: {
           airline: string | null
           airline_iata: string | null
+          booking_reference: string | null
           created_at: string
+          destination_airport_place_id: string | null
           destination_city: string | null
           destination_iata: string | null
           direction: string
           flight_number: string
           id: string
+          notes: string | null
+          origin_airport_place_id: string | null
           origin_city: string | null
           origin_iata: string | null
           raw_api: Json | null
@@ -390,12 +472,16 @@ export type Database = {
         Insert: {
           airline?: string | null
           airline_iata?: string | null
+          booking_reference?: string | null
           created_at?: string
+          destination_airport_place_id?: string | null
           destination_city?: string | null
           destination_iata?: string | null
           direction?: string
           flight_number: string
           id?: string
+          notes?: string | null
+          origin_airport_place_id?: string | null
           origin_city?: string | null
           origin_iata?: string | null
           raw_api?: Json | null
@@ -408,12 +494,16 @@ export type Database = {
         Update: {
           airline?: string | null
           airline_iata?: string | null
+          booking_reference?: string | null
           created_at?: string
+          destination_airport_place_id?: string | null
           destination_city?: string | null
           destination_iata?: string | null
           direction?: string
           flight_number?: string
           id?: string
+          notes?: string | null
+          origin_airport_place_id?: string | null
           origin_city?: string | null
           origin_iata?: string | null
           raw_api?: Json | null
