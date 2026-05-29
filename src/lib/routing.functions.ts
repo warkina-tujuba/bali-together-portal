@@ -2,26 +2,14 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { z } from "zod";
-
-const MAPBOX_TOKEN =
-  "pk.eyJ1Ijoid2Fya2luYXR1anViYSIsImEiOiJjbXA5ZWVvczkwMDU0MnFweHJqN240dDl2In0.GVNQCWU3xPPaal-Yjx0STQ";
+import { computeRoute } from "@/lib/google-maps.server";
 
 const Pt = z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) });
 
 function r4(n: number) { return Math.round(n * 1e4) / 1e4; }
 
 async function fetchLeg(o: { lat: number; lng: number }, d: { lat: number; lng: number }) {
-  const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${o.lng},${o.lat};${d.lng},${d.lat}?access_token=${MAPBOX_TOKEN}&geometries=polyline&overview=simplified`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Routes error ${res.status}`);
-  const j = (await res.json()) as { routes: Array<{ duration: number; distance: number; geometry: string }> };
-  const r = j.routes?.[0];
-  if (!r) throw new Error("No route");
-  return {
-    duration_min: Math.max(1, Math.round(r.duration / 60)),
-    distance_km: Math.round((r.distance / 1000) * 10) / 10,
-    polyline: r.geometry as string | null,
-  };
+  return computeRoute(o, d, "DRIVE");
 }
 
 export const computeLeg = createServerFn({ method: "POST" })
