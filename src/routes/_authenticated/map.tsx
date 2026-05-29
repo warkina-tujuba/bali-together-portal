@@ -140,6 +140,47 @@ function MapPage() {
     return crewLayer === "mine" ? isMe : !isMe;
   };
 
+  // Stops for the selected day (sorted by start_time)
+  const dayStops = useMemo(() => {
+    if (!selectedDay || !itin?.activities) return [];
+    return itin.activities
+      .filter((a) => a.day_date === selectedDay && a.lat != null && a.lng != null)
+      .sort((a, b) => (a.start_time ?? "").localeCompare(b.start_time ?? ""))
+      .map((a) => ({ id: a.id, title: a.title, lat: a.lat as number, lng: a.lng as number, start_time: a.start_time }));
+  }, [selectedDay, itin]);
+
+  // Fetch driving polylines between consecutive stops
+  const legFn = useServerFn(computeLeg);
+  const { data: drivingRoute } = useQuery({
+    enabled: dayStops.length >= 2,
+    queryKey: ["dayRoute", selectedDay, dayStops.map((s) => s.id)],
+    queryFn: async () => {
+      const legs = await Promise.all(
+        dayStops.slice(0, -1).map((o, i) => {
+          const d = dayStops[i + 1];
+          return legFn({ data: { origin: { lat: o.lat, lng: o.lng }, dest: { lat: d.lat, lng: d.lng }, hour: 12 } })
+            .catch(() => null);
+        }),
+      );
+      const coords: [number, number][] = [];
+      legs.forEach((leg, i) => {
+        if (leg?.polyline) {
+          const pts = decodePolyline(leg.polyline);
+          if (i === 0) coords.push(...pts);
+          else coords.push(...pts.slice(1));
+        } else {
+          // fallback straight line for this segment
+          const o = dayStops[i], d = dayStops[i + 1];
+          if (coords.length === 0) coords.push([o.lng, o.lat]);
+          coords.push([d.lng, d.lat]);
+        }
+      });
+      const totalMin = legs.reduce((s, l) => s + (l?.duration_min ?? 0), 0);
+      const totalKm = legs.reduce((s, l) => s + Number(l?.distance_km ?? 0), 0);
+      return { coords, totalMin, totalKm };
+    },
+  });
+
   const { pins, avatars, center, zoom, routeCoords } = useMemo(() => {
     const c: [number, number] = [
       data?.trip?.map_center_lng ?? 115.0875,
@@ -149,7 +190,6 @@ function MapPage() {
     if (!data) return { pins: [] as GMapPin[], avatars: [] as GMapAvatar[], center: c, zoom: z, routeCoords: undefined as [number, number][] | undefined };
     const memberById = new Map(data.members.map((m) => [m.id, m]));
 
-    // Stays filtered by crew layer
     const stayPins: GMapPin[] = data.stays
       .filter((s) => s.lat != null && s.lng != null && matchesCrewLayer(s.user_id))
       .map((s) => {
@@ -165,25 +205,22 @@ function MapPage() {
         };
       });
 
-    // Day activities
-    let activityPins: GMapPin[] = [];
-    let route: [number, number][] | undefined;
-    if (selectedDay && itin?.activities) {
-      const dayActs = itin.activities
-        .filter((a) => a.day_date === selectedDay && a.lat != null && a.lng != null)
-        .sort((a, b) => (a.start_time ?? "").localeCompare(b.start_time ?? ""));
-      activityPins = dayActs.map((a, idx) => ({
-        id: `act-${a.id}`,
-        lat: a.lat as number,
-        lng: a.lng as number,
-        label: `${idx + 1}. ${a.title}`,
-        sub: a.start_time ?? undefined,
-        kind: "activity" as const,
-      }));
-      if (dayActs.length >= 2) {
-        route = dayActs.map((a) => [a.lng as number, a.lat as number]);
-      }
-    }
+    const activityPins: GMapPin[] = dayStops.map((a, idx) => ({
+      id: `act-${a.id}`,
+      lat: a.lat,
+      lng: a.lng,
+      label: `${idx + 1}. ${a.title}`,
+      sub: a.start_time ?? undefined,
+      kind: "activity" as const,
+    }));
+
+    // Prefer real driving polyline; fall back to straight line through stops
+    const route: [number, number][] | undefined =
+      drivingRoute?.coords && drivingRoute.coords.length > 1
+        ? drivingRoute.coords
+        : dayStops.length >= 2
+          ? dayStops.map((a) => [a.lng, a.lat] as [number, number])
+          : undefined;
 
     const avatarList: GMapAvatar[] = liveLocs
       .filter((loc) => matchesCrewLayer(loc.user_id))
@@ -197,6 +234,8 @@ function MapPage() {
           avatar_url: member?.avatar_url ?? null,
         };
       });
+
+
 
     return { pins: [...stayPins, ...activityPins], avatars: avatarList, center: c, zoom: z, routeCoords: route };
     // eslint-disable-next-line react-hooks/exhaustive-deps
