@@ -65,7 +65,7 @@ function StartWizard() {
   const TOTAL = 6;
   const [step, setStep] = useState(0);
 
-  // Step 1 destination — Mapbox browser autocomplete via PlaceAutocomplete
+  // Step 1 destination — Google Places autocomplete via PlaceAutocomplete
   const [picked, setPicked] = useState<PlaceHit | null>(null);
 
   // Step 2 - date range
