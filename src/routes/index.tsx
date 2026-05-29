@@ -119,7 +119,7 @@ function Landing() {
                   size="lg"
                   variant="secondary"
                   className="h-11 rounded-xl px-4"
-                  onClick={() => navigate({ to: "/login", search: { invite: token } })}
+                  onClick={() => navigate({ to: "/plan", search: { invite: token } })}
                   disabled={!token.trim()}
                 >
                   Enter
