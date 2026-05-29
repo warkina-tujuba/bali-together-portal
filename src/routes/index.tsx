@@ -99,7 +99,7 @@ function Landing() {
               <Button
                 size="lg"
                 className="h-12 w-full rounded-xl bg-accent text-base font-semibold uppercase tracking-wider text-accent-foreground hover:bg-accent/90 sm:h-14"
-                onClick={() => navigate({ to: "/login" })}
+                onClick={() => navigate({ to: "/plan" })}
               >
                 Plan your trip <ArrowRight className="h-4 w-4" />
               </Button>
@@ -119,7 +119,7 @@ function Landing() {
                   size="lg"
                   variant="secondary"
                   className="h-11 rounded-xl px-4"
-                  onClick={() => navigate({ to: "/login", search: { invite: token } })}
+                  onClick={() => navigate({ to: "/plan", search: { invite: token } })}
                   disabled={!token.trim()}
                 >
                   Enter
@@ -191,7 +191,7 @@ function Landing() {
           <div className="mt-20 flex flex-col items-center gap-5 text-center sm:mt-24">
             <p className="font-display text-3xl sm:text-5xl">Ready when your crew is.</p>
             <Link
-              to="/login"
+              to="/plan"
               className="inline-flex h-12 items-center gap-2 rounded-full bg-accent px-8 text-sm font-medium uppercase tracking-[0.2em] text-accent-foreground transition hover:bg-accent/90"
             >
               Plan your trip <ArrowRight className="h-4 w-4" />

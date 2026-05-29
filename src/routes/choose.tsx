@@ -34,7 +34,7 @@ function ChoosePage() {
         <p className="mt-2 text-muted-foreground">Start a new trip, or jump into one a friend invited you to.</p>
 
         <div className="mt-8 grid gap-4 sm:grid-cols-2">
-          <Link to="/start">
+          <Link to="/plan">
             <Card className="group h-full cursor-pointer rounded-3xl border-0 p-7 shadow-card transition hover:-translate-y-0.5 hover:shadow-lg">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
                 <Sparkles className="h-6 w-6" />
@@ -57,7 +57,7 @@ function ChoosePage() {
                 e.preventDefault();
                 const t = extractToken(token);
                 if (!t) return;
-                navigate({ to: "/start", search: { invite: t } });
+                navigate({ to: "/plan", search: { invite: t } });
               }}
             >
               <Input value={token} onChange={(e) => setToken(e.target.value)} placeholder="Paste link or code…" className="h-11 rounded-xl" />
