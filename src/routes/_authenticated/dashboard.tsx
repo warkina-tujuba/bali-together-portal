@@ -300,32 +300,23 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* Setup reminders */}
-      {(!myFlight || !myStay) && (
-        <div className="mb-3 grid gap-2 sm:grid-cols-2">
-          {!myFlight && (
-            <FlightDialog
-              defaultDate={trip.start_date}
-              trigger={
-                <button className="flex w-full items-center justify-between gap-2 rounded-2xl bg-primary/10 px-4 py-2.5 text-left text-sm">
-                  <span className="flex items-center gap-2"><Plane className="h-4 w-4 text-primary" />Add your flight</span>
-                  <AlertCircle className="h-4 w-4 text-primary" />
-                </button>
-              }
-            />
-          )}
-          {!myStay && (
-            <StayDialog
-              trigger={
-                <button className="flex w-full items-center justify-between gap-2 rounded-2xl bg-primary/10 px-4 py-2.5 text-left text-sm">
-                  <span className="flex items-center gap-2"><HomeIcon className="h-4 w-4 text-primary" />Add your stay</span>
-                  <AlertCircle className="h-4 w-4 text-primary" />
-                </button>
-              }
-            />
-          )}
-        </div>
-      )}
+      {/* Setup prompts for skipped onboarding steps */}
+      <div className="mb-3">
+        <SetupPrompts
+          staysCount={data.stays.length}
+          plannedPlacesCount={(data as any).plannedPlaces?.length ?? 0}
+          flightsCount={data.flights.filter((f: any) => f.user_id === data.userId).length}
+          hasPreferences={!!(data as any).preferences}
+          onAddStay={() => setStayOpen(true)}
+          onAddFlight={() => setFlightOpen(true)}
+        />
+      </div>
+      <FlightDialog
+        defaultDate={trip.start_date}
+        open={flightOpen}
+        onOpenChange={setFlightOpen}
+      />
+      <StayDialog open={stayOpen} onOpenChange={setStayOpen} />
 
       {/* Date strip */}
       <div className="mb-3 -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
