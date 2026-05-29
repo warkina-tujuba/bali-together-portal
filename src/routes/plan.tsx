@@ -143,15 +143,20 @@ function PlanSearch() {
                 <CalendarIcon className="h-5 w-5 shrink-0 text-foreground" />
               </button>
             </SheetTrigger>
-            <SheetContent side="bottom" className="h-[85vh] rounded-t-3xl overflow-y-auto">
-              <SheetHeader>
-                <SheetTitle>Choose your {mode === "return" ? "travel dates" : "departure date"}</SheetTitle>
+            <SheetContent side="bottom" className="h-[90vh] rounded-t-3xl overflow-y-auto">
+              <SheetHeader className="text-left">
+                <div className="text-sm text-muted-foreground">
+                  {from?.name ?? "Anywhere"} to {to?.name ?? "Anywhere"}
+                </div>
+                <SheetTitle className="font-display text-2xl md:text-3xl">
+                  {mode === "return" ? "When are you travelling?" : "When are you flying?"}
+                </SheetTitle>
               </SheetHeader>
-              <div className="mt-4 overflow-x-auto">
+              <div className="mt-6 flex justify-center">
                 {mode === "return" ? (
                   <Calendar
                     mode="range"
-                    numberOfMonths={1}
+                    numberOfMonths={typeof window !== "undefined" && window.innerWidth >= 768 ? 2 : 1}
                     selected={range}
                     onSelect={(r) => {
                       draft.patch({
@@ -164,12 +169,12 @@ function PlanSearch() {
                     }}
                     disabled={(d) => d < new Date(new Date().setHours(0, 0, 0, 0))}
                     initialFocus
-                    className="pointer-events-auto mx-auto"
+                    className="pointer-events-auto [--cell-size:2.75rem] md:[--cell-size:3rem]"
                   />
                 ) : (
                   <Calendar
                     mode="single"
-                    numberOfMonths={1}
+                    numberOfMonths={typeof window !== "undefined" && window.innerWidth >= 768 ? 2 : 1}
                     selected={range?.from}
                     onSelect={(d) => {
                       draft.patch({
@@ -181,11 +186,30 @@ function PlanSearch() {
                     }}
                     disabled={(d) => d < new Date(new Date().setHours(0, 0, 0, 0))}
                     initialFocus
-                    className="pointer-events-auto mx-auto"
+                    className="pointer-events-auto [--cell-size:2.75rem] md:[--cell-size:3rem]"
                   />
                 )}
               </div>
 
+              {draft.start_date && (
+                <div className="sticky bottom-0 mt-6 -mx-6 border-t bg-card/95 px-6 py-4 backdrop-blur">
+                  <div className="mx-auto flex max-w-md items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-xs uppercase tracking-wide text-muted-foreground">Selected</div>
+                      <div className="truncate text-sm font-semibold">{dateLabel}</div>
+                    </div>
+                    <Button
+                      onClick={() =>
+                        draft.patch({ start_date: null, end_date: null, duration_days: null })
+                      }
+                      variant="ghost"
+                      className="text-primary"
+                    >
+                      Reset
+                    </Button>
+                  </div>
+                </div>
+              )}
             </SheetContent>
           </Sheet>
 
