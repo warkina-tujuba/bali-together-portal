@@ -1,18 +1,16 @@
+/// <reference types="google.maps" />
 import { useEffect, useRef, useState } from "react";
-import mapboxgl from "mapbox-gl";
-import "mapbox-gl/dist/mapbox-gl.css";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Search, MapPin } from "lucide-react";
 import type { StayPayload } from "./StaySearchForm";
+import { loadGoogleMaps } from "@/lib/google-maps-loader";
 
 type GeoFn = (input: { data: { q: string } }) => Promise<{
   results: Array<{ place_id: string; name: string; address: string; lat: number; lng: number }>;
 }>;
-
-const MAPBOX_TOKEN = "pk.eyJ1Ijoid2Fya2luYXR1anViYSIsImEiOiJjbXA5ZWVvczkwMDU0MnFweHJqN240dDl2In0.GVNQCWU3xPPaal-Yjx0STQ";
 
 const KINDS = [
   { id: "villa", label: "Villa", emoji: "🏡" },
@@ -42,8 +40,8 @@ export function StayAddressForm({ geocode, destinationHint, onSave }: {
   const [saving, setSaving] = useState(false);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<mapboxgl.Map | null>(null);
-  const markerRef = useRef<mapboxgl.Marker | null>(null);
+  const mapRef = useRef<google.maps.Map | null>(null);
+  const markerRef = useRef<google.maps.Marker | null>(null);
 
   async function handleResolve() {
     const q = address.trim();
@@ -77,43 +75,46 @@ export function StayAddressForm({ geocode, destinationHint, onSave }: {
     }
   }
 
-  // Init / update map when coords change
+  // Init / update Google Map when coords change
   useEffect(() => {
     if (!coords || !containerRef.current) return;
-    if (!mapRef.current) {
-      mapboxgl.accessToken = MAPBOX_TOKEN;
-      const map = new mapboxgl.Map({
-        container: containerRef.current,
-        style: "mapbox://styles/mapbox/streets-v12",
-        center: [coords.lng, coords.lat],
-        zoom: 15,
-      });
-      map.addControl(new mapboxgl.NavigationControl(), "top-right");
-      const el = document.createElement("div");
-      el.style.cssText = "width:36px;height:36px;border-radius:9999px;background:white;border:3px solid hsl(var(--primary));display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 4px 14px rgba(0,0,0,.25);cursor:grab;";
-      el.textContent = "🏠";
-      const marker = new mapboxgl.Marker({ element: el, draggable: true })
-        .setLngLat([coords.lng, coords.lat])
-        .addTo(map);
-      marker.on("dragend", () => {
-        const ll = marker.getLngLat();
-        setCoords({ lat: ll.lat, lng: ll.lng });
-      });
-      markerRef.current = marker;
-      mapRef.current = map;
-    } else {
-      mapRef.current.flyTo({ center: [coords.lng, coords.lat], zoom: 15 });
-      markerRef.current?.setLngLat([coords.lng, coords.lat]);
-    }
-    return () => {
-      // Don't remove on rerender; only on unmount via separate effect
-    };
+    let cancelled = false;
+    loadGoogleMaps()
+      .then((g) => {
+        if (cancelled || !containerRef.current) return;
+        if (!mapRef.current) {
+          mapRef.current = new g.maps.Map(containerRef.current, {
+            center: { lat: coords.lat, lng: coords.lng },
+            zoom: 15,
+            mapTypeControl: false,
+            streetViewControl: false,
+            fullscreenControl: false,
+            clickableIcons: false,
+          });
+          markerRef.current = new g.maps.Marker({
+            position: { lat: coords.lat, lng: coords.lng },
+            map: mapRef.current,
+            draggable: true,
+            title: "Drag to your exact spot",
+          });
+          markerRef.current.addListener("dragend", () => {
+            const pos = markerRef.current?.getPosition();
+            if (pos) setCoords({ lat: pos.lat(), lng: pos.lng() });
+          });
+        } else {
+          mapRef.current.panTo({ lat: coords.lat, lng: coords.lng });
+          mapRef.current.setZoom(15);
+          markerRef.current?.setPosition({ lat: coords.lat, lng: coords.lng });
+        }
+      })
+      .catch((e) => console.warn("[StayAddressForm] map load failed", e));
+    return () => { cancelled = true; };
   }, [coords]);
 
   useEffect(() => () => {
-    mapRef.current?.remove();
-    mapRef.current = null;
+    markerRef.current?.setMap(null);
     markerRef.current = null;
+    mapRef.current = null;
   }, []);
 
   async function save() {
