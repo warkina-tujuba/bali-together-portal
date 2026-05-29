@@ -2,11 +2,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { getDashboard, updateMyLocation, stopSharingLocation, listLiveLocations } from "@/lib/trip.functions";
+import { getDashboard, getItinerary, updateMyLocation, stopSharingLocation, listLiveLocations } from "@/lib/trip.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { Switch } from "@/components/ui/switch";
 import { MapPin, Radio } from "lucide-react";
 import { GoogleMap, type GMapPin, type GMapAvatar } from "@/components/maps/GoogleMap";
+import { CrewLayerToggle, type CrewLayer } from "@/components/plan/CrewLayerToggle";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/map")({ component: MapPage });
 
@@ -23,15 +25,20 @@ type LiveLoc = {
 
 function MapPage() {
   const fn = useServerFn(getDashboard);
+  const itinFn = useServerFn(getItinerary);
   const updateLoc = useServerFn(updateMyLocation);
   const stopLoc = useServerFn(stopSharingLocation);
   const listLive = useServerFn(listLiveLocations);
   const { data } = useQuery({ queryKey: ["dashboard"], queryFn: () => fn() });
+  const { data: itin } = useQuery({ queryKey: ["itinerary"], queryFn: () => itinFn() });
 
   const [sharing, setSharing] = useState(false);
   const [liveLocs, setLiveLocs] = useState<LiveLoc[]>([]);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null); // null = all stays only
+  const [crewLayer, setCrewLayer] = useState<CrewLayer>("both");
 
-  // Fetch initial live locations + subscribe to realtime
+  const meId = data?.profile?.id ?? null;
+
   useEffect(() => {
     if (!data?.trip) return;
     let cancelled = false;
@@ -40,22 +47,18 @@ function MapPage() {
     });
     const channel = supabase
       .channel("live_locations")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "live_locations" },
-        (payload) => {
-          setLiveLocs((prev) => {
-            if (payload.eventType === "DELETE") {
-              const oldRow = payload.old as LiveLoc;
-              return prev.filter((l) => l.user_id !== oldRow.user_id);
-            }
-            const row = payload.new as LiveLoc;
-            const next = prev.filter((l) => l.user_id !== row.user_id);
-            if (row.sharing) next.push(row);
-            return next;
-          });
-        },
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "live_locations" }, (payload) => {
+        setLiveLocs((prev) => {
+          if (payload.eventType === "DELETE") {
+            const oldRow = payload.old as LiveLoc;
+            return prev.filter((l) => l.user_id !== oldRow.user_id);
+          }
+          const row = payload.new as LiveLoc;
+          const next = prev.filter((l) => l.user_id !== row.user_id);
+          if (row.sharing) next.push(row);
+          return next;
+        });
+      })
       .subscribe();
     return () => {
       cancelled = true;
@@ -63,7 +66,6 @@ function MapPage() {
     };
   }, [data?.trip?.id, listLive]);
 
-  // Geolocation watcher
   useEffect(() => {
     if (!sharing) return;
     if (!("geolocation" in navigator)) {
@@ -102,52 +104,97 @@ function MapPage() {
     if (!next) await stopLoc().catch(() => {});
   };
 
-  const { pins, avatars, center, zoom } = useMemo(() => {
+  // Days available
+  const days = useMemo(() => {
+    const list = (itin?.days ?? []).slice().sort((a, b) => (a.day_date < b.day_date ? -1 : 1));
+    return list;
+  }, [itin]);
+
+  const crewCount = useMemo(() => {
+    if (!data?.members) return 0;
+    return data.members.filter((m) => m.id !== meId).length;
+  }, [data, meId]);
+
+  const matchesCrewLayer = (user_id: string) => {
+    if (crewLayer === "both") return true;
+    const isMe = user_id === meId;
+    return crewLayer === "mine" ? isMe : !isMe;
+  };
+
+  const { pins, avatars, center, zoom, routeCoords } = useMemo(() => {
     const c: [number, number] = [
       data?.trip?.map_center_lng ?? 115.0875,
       data?.trip?.map_center_lat ?? -8.829,
     ];
     const z = data?.trip?.map_default_zoom ?? 11;
-    if (!data) return { pins: [] as GMapPin[], avatars: [] as GMapAvatar[], center: c, zoom: z };
+    if (!data) return { pins: [] as GMapPin[], avatars: [] as GMapAvatar[], center: c, zoom: z, routeCoords: undefined as [number, number][] | undefined };
     const memberById = new Map(data.members.map((m) => [m.id, m]));
-    const pinList: GMapPin[] = data.stays
-      .filter((s) => s.lat != null && s.lng != null)
+
+    // Stays filtered by crew layer
+    const stayPins: GMapPin[] = data.stays
+      .filter((s) => s.lat != null && s.lng != null && matchesCrewLayer(s.user_id))
       .map((s) => {
         const member = memberById.get(s.user_id);
+        const isMe = s.user_id === meId;
         return {
-          id: s.id,
+          id: `stay-${s.id}`,
           lat: s.lat!,
           lng: s.lng!,
-          label: `${member?.full_name ?? "Guest"}'s stay`,
+          label: isMe ? "My stay" : `${member?.full_name ?? "Crew"}'s base`,
           sub: s.name,
           kind: "stay" as const,
         };
       });
-    const avatarList: GMapAvatar[] = liveLocs.map((loc) => {
-      const member = memberById.get(loc.user_id);
-      return {
-        user_id: loc.user_id,
-        lat: loc.lat,
-        lng: loc.lng,
-        name: member?.full_name ?? "Guest",
-        avatar_url: member?.avatar_url ?? null,
-      };
-    });
-    return { pins: pinList, avatars: avatarList, center: c, zoom: z };
-  }, [data, liveLocs]);
+
+    // Day activities
+    let activityPins: GMapPin[] = [];
+    let route: [number, number][] | undefined;
+    if (selectedDay && itin?.activities) {
+      const dayActs = itin.activities
+        .filter((a) => a.day_date === selectedDay && a.lat != null && a.lng != null)
+        .sort((a, b) => (a.start_time ?? "").localeCompare(b.start_time ?? ""));
+      activityPins = dayActs.map((a, idx) => ({
+        id: `act-${a.id}`,
+        lat: a.lat as number,
+        lng: a.lng as number,
+        label: `${idx + 1}. ${a.title}`,
+        sub: a.start_time ?? undefined,
+        kind: "activity" as const,
+      }));
+      if (dayActs.length >= 2) {
+        route = dayActs.map((a) => [a.lng as number, a.lat as number]);
+      }
+    }
+
+    const avatarList: GMapAvatar[] = liveLocs
+      .filter((loc) => matchesCrewLayer(loc.user_id))
+      .map((loc) => {
+        const member = memberById.get(loc.user_id);
+        return {
+          user_id: loc.user_id,
+          lat: loc.lat,
+          lng: loc.lng,
+          name: member?.full_name ?? "Guest",
+          avatar_url: member?.avatar_url ?? null,
+        };
+      });
+
+    return { pins: [...stayPins, ...activityPins], avatars: avatarList, center: c, zoom: z, routeCoords: route };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, liveLocs, itin, selectedDay, crewLayer, meId]);
 
   if (!data) return <div className="p-10 text-center text-muted-foreground">Loading map…</div>;
   if (!data.trip) return <div className="p-10 text-center text-muted-foreground">No trip.</div>;
 
-  const liveCount = liveLocs.length;
+  const liveCount = avatars.length;
 
   return (
     <div className="mx-auto max-w-5xl px-3 py-4">
       <div className="flex flex-wrap items-end justify-between gap-3 px-2 pb-3">
         <div>
-          <h1 className="font-display text-3xl">Stay map</h1>
+          <h1 className="font-display text-3xl">My Map</h1>
           <p className="text-sm text-muted-foreground">
-            <MapPin className="inline h-3.5 w-3.5" /> {pins.length} stays · {data.trip.destination}
+            <MapPin className="inline h-3.5 w-3.5" /> {pins.filter((p) => p.kind === "stay").length} bases · {data.trip.destination}
             {liveCount > 0 && (
               <span className="ml-2 text-green-600">
                 <Radio className="inline h-3.5 w-3.5" /> {liveCount} live
@@ -155,18 +202,67 @@ function MapPage() {
             )}
           </p>
         </div>
-        <label className="flex items-center gap-2 rounded-full border bg-card px-3 py-2 text-sm shadow-sm">
-          <Radio className={`h-4 w-4 ${sharing ? "text-green-600" : "text-muted-foreground"}`} />
-          <span>Share my location</span>
-          <Switch checked={sharing} onCheckedChange={toggleSharing} />
-        </label>
       </div>
-      <div className="overflow-hidden rounded-3xl shadow-card" style={{ height: "72vh" }}>
-        <GoogleMap center={center} zoom={zoom} pins={pins} avatars={avatars} />
+
+      {/* Controls row: day chips + crew layer + share */}
+      <div className="mb-3 flex flex-wrap items-center gap-2 px-2">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <DayChip active={selectedDay === null} onClick={() => setSelectedDay(null)}>
+            All stays
+          </DayChip>
+          {days.map((d, i) => {
+            const date = new Date(d.day_date);
+            const label = `Day ${i + 1}`;
+            const sub = date.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+            return (
+              <DayChip key={d.id} active={selectedDay === d.day_date} onClick={() => setSelectedDay(d.day_date)}>
+                <span className="font-medium">{label}</span>
+                <span className="ml-1 text-[10px] opacity-70">{sub}</span>
+              </DayChip>
+            );
+          })}
+        </div>
+        <div className="ml-auto flex items-center gap-2">
+          <CrewLayerToggle value={crewLayer} onChange={setCrewLayer} crewCount={crewCount} />
+          <label className="flex items-center gap-2 rounded-full border bg-card px-3 py-1.5 text-xs shadow-sm">
+            <Radio className={`h-3.5 w-3.5 ${sharing ? "text-green-600" : "text-muted-foreground"}`} />
+            <span>Share live</span>
+            <Switch checked={sharing} onCheckedChange={toggleSharing} />
+          </label>
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-3xl shadow-card" style={{ height: "70vh" }}>
+        <GoogleMap center={center} zoom={zoom} pins={pins} avatars={avatars} routeCoords={routeCoords} />
       </div>
       <p className="px-2 pt-2 text-xs text-muted-foreground">
-        Live location is only visible to your trip group, and only while this page is open.
+        {selectedDay
+          ? "Showing the day's route between activities, plus bases for your selected crew layer."
+          : "Showing bases for your selected crew layer. Pick a day above to see that day's route."}
+        {" "}Live location is only visible to your trip group, and only while this page is open.
       </p>
     </div>
+  );
+}
+
+function DayChip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "rounded-full border px-3 py-1.5 text-xs transition",
+        active ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-muted-foreground hover:text-foreground",
+      )}
+    >
+      {children}
+    </button>
   );
 }
