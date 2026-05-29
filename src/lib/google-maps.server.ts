@@ -1,14 +1,19 @@
-// Server-only Google Maps Platform helpers. Uses GOOGLE_MAPS_SERVER_API_KEY.
+// Server-only Google Maps Platform helpers.
+// Routes through the Lovable connector gateway (Lovable-managed Google Maps).
 // Never import this from client code.
 
-const PLACES_BASE = "https://places.googleapis.com/v1";
-const ROUTES_BASE = "https://routes.googleapis.com";
-const GEOCODE_BASE = "https://maps.googleapis.com/maps/api/geocode/json";
+const GATEWAY_URL = "https://connector-gateway.lovable.dev/google_maps";
 
-function key(): string {
-  const k = process.env.GOOGLE_MAPS_SERVER_API_KEY;
-  if (!k) throw new Error("GOOGLE_MAPS_SERVER_API_KEY missing");
-  return k;
+function authHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  const lovableKey = process.env.LOVABLE_API_KEY;
+  if (!lovableKey) throw new Error("LOVABLE_API_KEY is not configured");
+  const gmapsKey = process.env.GOOGLE_MAPS_API_KEY;
+  if (!gmapsKey) throw new Error("GOOGLE_MAPS_API_KEY is not configured");
+  return {
+    Authorization: `Bearer ${lovableKey}`,
+    "X-Connection-Api-Key": gmapsKey,
+    ...extra,
+  };
 }
 
 // ---------- Places API (New) ----------
@@ -68,12 +73,11 @@ export async function placeDetails(
   placeId: string,
   level: PlaceDetailsLevel = "card",
 ): Promise<PlaceDetailsRaw> {
-  const url = `${PLACES_BASE}/places/${encodeURIComponent(placeId)}`;
+  const url = `${GATEWAY_URL}/places/v1/places/${encodeURIComponent(placeId)}`;
   const res = await fetch(url, {
-    headers: {
-      "X-Goog-Api-Key": key(),
+    headers: authHeaders({
       "X-Goog-FieldMask": level === "detail" ? DETAIL_FIELDS : CARD_FIELDS,
-    },
+    }),
   });
   if (!res.ok) throw new Error(`Places details ${res.status}: ${await res.text()}`);
   return (await res.json()) as PlaceDetailsRaw;
@@ -85,8 +89,8 @@ export function placePhotoUrl(photoName: string, maxWidthPx = 800): string {
 }
 
 export async function placePhotoRedirect(photoName: string, maxWidthPx = 800): Promise<string> {
-  const url = `${PLACES_BASE}/${photoName}/media?maxWidthPx=${maxWidthPx}&skipHttpRedirect=true&key=${encodeURIComponent(key())}`;
-  const res = await fetch(url);
+  const url = `${GATEWAY_URL}/places/v1/${photoName}/media?maxWidthPx=${maxWidthPx}&skipHttpRedirect=true`;
+  const res = await fetch(url, { headers: authHeaders() });
   if (!res.ok) throw new Error(`Photo ${res.status}`);
   const j = (await res.json()) as { photoUri?: string };
   if (!j.photoUri) throw new Error("No photoUri");
@@ -120,9 +124,9 @@ export async function placeAutocomplete(
       },
     };
   }
-  const res = await fetch(`${PLACES_BASE}/places:autocomplete`, {
+  const res = await fetch(`${GATEWAY_URL}/places/v1/places:autocomplete`, {
     method: "POST",
-    headers: { "X-Goog-Api-Key": key(), "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`Autocomplete ${res.status}: ${await res.text()}`);
@@ -152,13 +156,13 @@ export async function placeSearchText(
       },
     };
   }
-  const res = await fetch(`${PLACES_BASE}/places:searchText`, {
+  const res = await fetch(`${GATEWAY_URL}/places/v1/places:searchText`, {
     method: "POST",
-    headers: {
-      "X-Goog-Api-Key": key(),
+    headers: authHeaders({
       "Content-Type": "application/json",
-      "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount",
-    },
+      "X-Goog-FieldMask":
+        "places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount",
+    }),
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`Text search ${res.status}: ${await res.text()}`);
@@ -182,13 +186,12 @@ export async function computeRoute(
     routingPreference: mode === "DRIVE" ? "TRAFFIC_AWARE" : undefined,
     polylineQuality: "OVERVIEW",
   };
-  const res = await fetch(`${ROUTES_BASE}/directions/v2:computeRoutes`, {
+  const res = await fetch(`${GATEWAY_URL}/routes/directions/v2:computeRoutes`, {
     method: "POST",
-    headers: {
-      "X-Goog-Api-Key": key(),
+    headers: authHeaders({
       "Content-Type": "application/json",
       "X-Goog-FieldMask": "routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline",
-    },
+    }),
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`Routes ${res.status}: ${await res.text()}`);
@@ -197,7 +200,6 @@ export async function computeRoute(
   };
   const r = j.routes?.[0];
   if (!r) throw new Error("No route");
-  // duration is like "1234s"
   const secs = parseInt(String(r.duration ?? "0").replace(/s$/, ""), 10) || 0;
   return {
     duration_min: Math.max(1, Math.round(secs / 60)),
@@ -209,8 +211,8 @@ export async function computeRoute(
 // ---------- Geocoding ----------
 
 export async function geocode(address: string): Promise<{ lat: number; lng: number; formatted: string; place_id: string } | null> {
-  const url = `${GEOCODE_BASE}?address=${encodeURIComponent(address)}&key=${encodeURIComponent(key())}`;
-  const res = await fetch(url);
+  const url = `${GATEWAY_URL}/maps/api/geocode/json?address=${encodeURIComponent(address)}`;
+  const res = await fetch(url, { headers: authHeaders() });
   if (!res.ok) return null;
   const j = (await res.json()) as {
     results?: Array<{
