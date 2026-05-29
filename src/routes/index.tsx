@@ -99,7 +99,7 @@ function Landing() {
               <Button
                 size="lg"
                 className="h-12 w-full rounded-xl bg-accent text-base font-semibold uppercase tracking-wider text-accent-foreground hover:bg-accent/90 sm:h-14"
-                onClick={() => navigate({ to: "/login" })}
+                onClick={() => navigate({ to: "/plan" })}
               >
                 Plan your trip <ArrowRight className="h-4 w-4" />
               </Button>
