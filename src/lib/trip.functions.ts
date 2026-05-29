@@ -766,6 +766,9 @@ export const applyPreferences = createServerFn({ method: "POST" })
       budget: data.budget,
     });
 
+    if (!trip.start_date || !trip.end_date) {
+      return { ok: true, generated: 0, skipped: "no-dates" };
+    }
     const events = planTrip(trip.start_date, trip.end_date, data);
     const days = buildDaySummaries(events);
 
