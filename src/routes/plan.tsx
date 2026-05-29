@@ -161,6 +161,7 @@ function PlanSearch() {
                 <SheetTitle className="font-display text-2xl md:text-3xl">
                   {mode === "return" ? "When are you travelling?" : "When are you flying?"}
                 </SheetTitle>
+                <p className="text-sm font-medium text-primary">{calendarPhase}</p>
               </SheetHeader>
               <div className="mt-6 flex justify-center">
                 {mode === "return" ? (
