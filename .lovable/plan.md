@@ -1,157 +1,231 @@
-# Google Maps Platform Migration — Phased Plan
 
-Massive scope. Splitting into 5 phases so each is reviewable and shippable. Phase 1 must land before any UI changes.
+# Travel Link Onboarding Redesign Plan
 
-## Decisions made for you
-- **Server key**: `GOOGLE_MAPS_SERVER_API_KEY` — saved as runtime secret ✅
-- **Browser key**: Lovable blocks user-defined `VITE_*` secrets. Since the browser key is referrer-restricted (safe to embed, same pattern as current `MAPBOX_TOKEN`), I'll create `src/lib/google-maps.ts` with the key as a `const`. You paste it once when you review Phase 2. If you'd rather, you can add it as a non-VITE secret (`GOOGLE_MAPS_BROWSER_API_KEY`) and I'll wire it via a small `/api/public/maps-config` route — slower, more roundtrips.
-- **No connector**: per your choice. You manage referrer allowlists in Google Cloud Console (include `*.lovable.app`, `warkina.com`, `*.warkina.com`).
+Goal: replace the current 6-step `/start` wizard with a polished, mobile-first, travel-native onboarding flow that produces an account, profile, trip, multiple stays, planned places, optional arrival info, and a starter day-shell itinerary. Landing page (`src/routes/index.tsx`) is untouched.
 
----
+## 1. Current state (what we're replacing)
 
-## Phase 1 — Data model & server foundation
+- Entry: `index.tsx` "Plan your trip" → `/login` → `/choose` → `/start` (under `_authenticated`, requires login first).
+- `src/routes/_authenticated/start.tsx` is a single-file 6-step wizard: destination → dates → flight → stay → vibe → avatar.
+- Login is forced before any trip input — friction.
+- Date picker is a basic shadcn `Calendar` range.
+- Stays are single-stay (one `accommodations` row via `saveAccommodation`).
+- No "planned places" concept exists at all.
+- Avatars use `AvatarPicker` (preset characters) — to be removed.
+- Flights are a full step with smart/lookup/paste sub-forms — too central.
+- No marker colour, no starter itinerary generation on completion.
 
-**Migration** (`supabase--migration`):
+DB today: `profiles` (no `marker_colour`, no `google_avatar_url`), `trips` (start/end required, no duration-only mode, no country/place_id), `accommodations` (good — already supports multi-stay per trip), no `planned_places` table, `itinerary_days` exists but isn't seeded by onboarding.
 
-```sql
-ALTER TABLE public.activities ADD COLUMN
-  google_place_id text,
-  google_maps_url text,
-  cached_google_rating numeric,
-  cached_google_review_count integer,
-  cached_google_reviews jsonb,
-  cached_google_photo_url text,
-  cached_google_address text,
-  cached_google_opening_hours jsonb,
-  cached_google_website_url text,
-  google_data_last_refreshed_at timestamptz;
+## 2. New flow & routes
 
-ALTER TABLE public.activity_seeds ADD COLUMN
-  google_place_id text,
-  google_maps_url text,
-  cached_google_rating numeric,
-  cached_google_review_count integer,
-  cached_google_reviews jsonb,
-  cached_google_photo_url text,
-  cached_google_address text,
-  cached_google_opening_hours jsonb,
-  cached_google_website_url text,
-  google_data_last_refreshed_at timestamptz;
+New flow lives at `/plan` (so we can keep `/start` working until cutover, then redirect). It is a **public** route that allows draft entry before auth, then prompts Google sign-in before final save.
 
-ALTER TABLE public.accommodations ADD COLUMN
-  google_place_id text,
-  google_maps_url text;
-
-ALTER TABLE public.activities ADD COLUMN
-  booking_status text DEFAULT 'not_booked'
-    CHECK (booking_status IN ('not_booked','need_to_book','booked')),
-  confirmation_number text,
-  travel_time_from_previous integer,
-  distance_from_previous numeric,
-  end_time_override time;
-
--- Flights: add manual-entry fields
-ALTER TABLE public.flights ADD COLUMN
-  booking_reference text,
-  notes text,
-  origin_airport_place_id text,
-  destination_airport_place_id text;
-
-CREATE INDEX IF NOT EXISTS idx_activities_google_place_id ON public.activities(google_place_id);
-CREATE INDEX IF NOT EXISTS idx_activity_seeds_google_place_id ON public.activity_seeds(google_place_id);
+```text
+Homepage "Plan your trip"
+   ↓
+/plan                 ← public, draft state in localStorage + Zustand
+   step 1: Destination      (Google Places Autocomplete)
+   step 2: Dates or Duration (range OR duration chips)
+   step 3: Places on radar  (multi-add via Places Autocomplete, chips)
+   step 4: Stays            (multi-add via Places Autocomplete, optional dates)
+   step 5: Arrival          (optional, Jetstar-style search; AviationStack enrichment)
+   step 6: Vibe             (optional sliders)
+   ↓ "Save your trip"
+/plan/auth            ← Continue with Google (only gate)
+   ↓
+/plan/profile         ← name + photo (prefilled from Google) + marker colour
+   ↓ finalize
+   → server: create trip + stays + planned_places + preferences + day shells
+   ↓
+/plan/ready           ← summary + "Start discovering"
+   ↓
+/dashboard            ← starter plan visible, prompts for skipped steps
 ```
 
-Existing `route_legs` table already supports route caching — reused.
+Join flow (`/start?invite=...` → accept) is preserved unchanged. Invitees land on `/plan/profile` (name/photo/colour only) after Google sign-in.
 
-**New server files** (all under `src/lib/`, server key only):
-- `src/lib/google-maps.server.ts` — fetch helpers: `placeDetails(placeId, fields)`, `placeAutocomplete(input, sessionToken)`, `placeSearchText(q)`, `computeRoute({origin,destination,mode})`, `geocode(address)`, `placePhoto(name, maxWidth)`.
-  - All call `https://places.googleapis.com/v1/...`, `https://routes.googleapis.com/...`, `https://maps.googleapis.com/maps/api/geocode/json`.
-  - Header: `X-Goog-Api-Key: process.env.GOOGLE_MAPS_SERVER_API_KEY` + `X-Goog-FieldMask`.
-- `src/lib/places.functions.ts` (`createServerFn`):
-  - `getPlaceDetails({ placeId, level: 'card'|'detail' })` — checks cache first, refreshes if stale per your TTLs (rating/reviews/photos 7d, address/coords 30d, hours 24h).
-  - `refreshActivityGoogleData({ activityId })` — admin/manual refresh.
-  - `searchPlacesAutocomplete({ input, sessionToken, types? })` — proxied through server (keeps server key safe; also enables consistent typing).
-  - `searchPlacesByText({ query, locationBias? })`.
-- `src/lib/routes.functions.ts`:
-  - `computeLeg({ origin, dest, mode })` — already exists for Mapbox; rewrite to call Routes API; persist to `route_legs` cache.
-  - `optimizeDayRoute({ trip_id, day_date })` — uses Route Optimization API.
+## 3. Files to add / change
 
-**Note**: All new server fns use `requireSupabaseAuth`. Field masks are mandatory (cost control).
+### New routes
+- `src/routes/plan.tsx` — public layout (no auth wrapper), renders the wizard shell with progress dots, `<Outlet/>`, mobile-first bottom CTA bar.
+- `src/routes/plan.index.tsx` — step 1 (destination).
+- `src/routes/plan.dates.tsx`, `plan.places.tsx`, `plan.stays.tsx`, `plan.arrival.tsx`, `plan.vibe.tsx` — steps 2–6.
+- `src/routes/plan.auth.tsx` — Google sign-in gate ("Save your trip").
+- `src/routes/plan.profile.tsx` — name/photo/marker colour.
+- `src/routes/plan.ready.tsx` — completion + summary + CTAs.
+- Keep `/start` as a thin redirect to `/plan` (preserves invite param → routes to `/plan/auth?invite=...`).
 
----
+### New components (`src/components/plan/`)
+- `WizardShell.tsx` — progress bar (Jetstar-style segmented), back, skip, primary CTA.
+- `DestinationStep.tsx` — wraps `PlaceAutocomplete`, large hero input, confirmation card with static map thumbnail.
+- `DateRangeStep.tsx` — segmented toggle [Dates | Duration]. Dates mode = `react-day-picker` range, two-month on tablet, one-month mobile, big day cells, animated range fill. Duration mode = chip grid (3/5/7/10/14/Custom) + "Add exact dates later" link.
+- `PlacesRadarStep.tsx` — Places Autocomplete + chip list with edit sheet (nights, optional date range).
+- `StaysStep.tsx` — Places Autocomplete first; "Paste booking link" as secondary tab; chip list of stays with date assignment if trip dates exist.
+- `ArrivalStep.tsx` — Jetstar-style From/To/Date card, optional flight number; AviationStack lookup; manual fallback.
+- `VibeStep.tsx` — 7 sliders (refined from existing) with labelled poles.
+- `ProfileStep.tsx` — avatar (Google photo / upload to Supabase Storage `profile-photos` bucket), name field, marker colour swatch (8 fixed colours).
+- `ReadySummary.tsx` — summary card + "what we prepared" list.
+- `StaticMapThumb.tsx` — Google Static Maps image for confirmation cards.
 
-## Phase 2 — Google Maps rendering
+### Draft state
+- `src/lib/plan-draft.ts` — Zustand store + `localStorage` persistence under key `tl:plan:draft:v1`. Shape mirrors final payload. Survives Google OAuth round-trip (read after redirect on `/plan/profile`).
 
-- Add `src/lib/google-maps.ts` with `GOOGLE_MAPS_BROWSER_API_KEY` constant (you paste the key here).
-- New `src/components/maps/GoogleMap.tsx`:
-  - Loads `https://maps.googleapis.com/maps/api/js?key=...&libraries=places,marker&loading=async&callback=__initGmap`.
-  - Singleton loader so the script only loads once.
-  - Props mirror current `SnapMap.tsx`: `center`, `zoom`, `pins`, `avatars`, `focusedId`, `onPinClick`, `routeCoords`.
-  - Uses `google.maps.Marker` (NOT AdvancedMarkerElement — no mapId).
-  - Pins styled by category via custom icon (SVG circle with emoji label, matching current Mapbox style).
-  - Polyline for route via `google.maps.Polyline`.
-  - Graceful fallback `<div>` with "Map unavailable" if script load fails.
-- Replace usages of `SnapMap`/`ItineraryMap` with `GoogleMap`. Keep old Mapbox files until Phase 5 cleanup.
+### Server functions (`src/lib/plan.functions.ts`, new)
+- `finalizeTripDraft({ draft, profile })` — single transactional server fn, protected by `requireSupabaseAuth`. Does:
+  1. Upsert profile (display_name, avatar_url, marker_colour).
+  2. Insert `trips` row (handles duration-only by setting end_date = start_date + duration or leaving flexible flag).
+  3. Bulk insert `accommodations` (stays).
+  4. Bulk insert `planned_places`.
+  5. Insert `flights` row if arrival provided.
+  6. Insert `trip_preferences` if vibe provided.
+  7. Generate day shells into `itinerary_days` (one row per trip day; if duration-only, anchor to today as placeholder until exact dates set; flag `is_placeholder = true`).
+  8. Update `profiles.trip_id` + `onboarding_complete=true`.
+  9. Return `{ tripId }`.
+- `generateStarterPlan(tripId)` — pure helper, called inside `finalizeTripDraft`. Heuristic only (no AI yet): Day 1 = "Arrival & settle in"; if planned_places exist, distribute them as area labels across days; last day = "Departure"; intermediate days get generic prompts ("Explore near {place}", "Food, beach, or local discovery").
+- `uploadProfilePhoto({ file })` — signed upload to `profile-photos` bucket (path `{userId}/avatar.jpg`).
 
----
+### Removed / deprecated
+- `AvatarPicker.tsx` — drop from flow (keep file for now, unused).
+- `OccasionPicker`, `FlightSmartForm` usage in onboarding — flight components stay for in-trip use, just not in onboarding hot path.
 
-## Phase 3 — Discovery, Map tab, Activity Detail rewire
+## 4. Data model changes (single migration)
 
-**Discovery** (`src/routes/_authenticated/discover.tsx`):
-- Card data: read `cached_google_rating`, `cached_google_review_count`, `cached_google_photo_url` from `activity_seeds`. Hide rows when null.
-- Map view toggle uses new `GoogleMap`.
-- Search bar: add Places Autocomplete (server-proxied) for places/landmarks — selecting recenters map + filters by distance.
-- Near me: browser geolocation → distance sort, falls back to accommodation.
+```sql
+-- profiles
+ALTER TABLE public.profiles
+  ADD COLUMN marker_colour text,
+  ADD COLUMN google_avatar_url text,
+  ADD COLUMN uploaded_avatar_url text,
+  ADD COLUMN auth_provider text;
 
-**Map tab** (`src/routes/_authenticated/map.tsx`): swap Mapbox for `GoogleMap`. Mobile pin tap → existing `MapPinPreviewSheet`.
+-- trips
+ALTER TABLE public.trips
+  ALTER COLUMN start_date DROP NOT NULL,
+  ALTER COLUMN end_date DROP NOT NULL,
+  ADD COLUMN duration_days int,
+  ADD COLUMN duration_nights int,
+  ADD COLUMN dates_flexible boolean NOT NULL DEFAULT false,
+  ADD COLUMN destination_place_id text,
+  ADD COLUMN destination_country text,
+  ADD COLUMN destination_lat double precision,
+  ADD COLUMN destination_lng double precision,
+  ADD COLUMN destination_google_maps_url text;
 
-**Activity detail** (`SeedDetailDrawer.tsx`):
-- New sections: Why you'll love it / What's included / Good to know / Location (embedded `GoogleMap` mini) / Reviews / Booking.
-- On open: call `getPlaceDetails({ level: 'detail' })` once; render rating, reviews snippets (3–5), opening hours, photos, Google Maps link.
-- Sticky bottom CTA already exists — keep, add "Book activity" when `booking_url` set.
+-- planned_places (new)
+CREATE TABLE public.planned_places (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  trip_id uuid NOT NULL REFERENCES public.trips(id) ON DELETE CASCADE,
+  created_by uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  name text NOT NULL,
+  address text,
+  google_place_id text,
+  lat double precision,
+  lng double precision,
+  nights int,
+  start_date date,
+  end_date date,
+  source text NOT NULL DEFAULT 'google_places',
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.planned_places TO authenticated;
+GRANT ALL ON public.planned_places TO service_role;
+ALTER TABLE public.planned_places ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Crew read planned places" ON public.planned_places FOR SELECT TO authenticated
+  USING (trip_id = current_user_trip_id());
+CREATE POLICY "Crew insert planned places" ON public.planned_places FOR INSERT TO authenticated
+  WITH CHECK (trip_id = current_user_trip_id() AND created_by = auth.uid());
+CREATE POLICY "Owner updates/deletes" ON public.planned_places FOR UPDATE TO authenticated
+  USING (created_by = auth.uid()) WITH CHECK (created_by = auth.uid());
+CREATE POLICY "Owner deletes" ON public.planned_places FOR DELETE TO authenticated
+  USING (created_by = auth.uid());
 
-**Add to itinerary sheet** (`AddToItinerarySheet.tsx`):
-- Already shipped. Wire `computeLeg` (Routes API) when day/time selected → show "28 min from your accommodation" and conflict warning.
+-- itinerary_days: ensure placeholder flag exists
+ALTER TABLE public.itinerary_days
+  ADD COLUMN IF NOT EXISTS is_placeholder boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS prompt text;
 
----
+-- storage bucket
+INSERT INTO storage.buckets (id, name, public) VALUES ('profile-photos', 'profile-photos', true)
+  ON CONFLICT DO NOTHING;
+-- (RLS storage policies for owner write, public read added in migration)
+```
 
-## Phase 4 — Accommodation, Admin helper, Flights
+`handle_new_user` trigger updated to also persist `google_avatar_url` and `auth_provider = 'google'` from `raw_app_meta_data`.
 
-- **Accommodation search**: replace `PlaceAutocomplete.tsx` (Mapbox geocoder) with new `GooglePlaceAutocomplete.tsx` using server-proxied `searchPlacesAutocomplete`. Save place_id, name, address, lat/lng, maps URL.
-- **Admin Place ID helper** at `/admin`: per activity, search → pick → save → "Refresh Google data" button.
-- **Flights**: add manual entry form using Google Places autocomplete for airports (types: `airport`). No third-party flight API.
+## 5. Auth & draft persistence
 
----
+- Draft Zustand store hydrates on `/plan` mount from `localStorage`.
+- "Save your trip" CTA on any step → check `supabase.auth.getUser()`. If unauthenticated, push to `/plan/auth?next=/plan/profile`.
+- `/plan/auth` calls `lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin + "/plan/profile" })`.
+- On return, `/plan/profile` reads draft from localStorage (survives redirect), prefills name/photo from `user.user_metadata`, gates Finalize until marker_colour selected.
+- Finalize calls `finalizeTripDraft`, clears draft on success, navigates to `/plan/ready`.
 
-## Phase 5 — Mapbox removal + QA
+## 6. Google Places & AviationStack
 
-After verifying Phases 2–4 visually:
-- Remove `src/components/dashboard/SnapMap.tsx`, `ItineraryMap.tsx`, `src/lib/mapbox.ts`, `src/components/trip/PlaceAutocomplete.tsx`, `StaySearchForm.tsx` Mapbox calls.
-- `bun remove mapbox-gl`.
-- Audit imports.
+- Destination, planned places, stays all use existing `PlaceAutocomplete` + `placeAutocomplete`/`placeDetails` server fns (already on Lovable connector gateway). No new API keys.
+- Static Maps thumbnails go through a new tiny server route `/api/public/static-map` that proxies the connector (or via existing browser key since it's allowlisted).
+- AviationStack: keep current `flightLookup` server fn; called only when user enters flight number + date in `ArrivalStep`. Manual fallback writes directly to `flights`.
 
----
+## 7. Starter plan generation (v1, heuristic)
 
-## Caching strategy (Phase 1 helper)
-`getPlaceDetails` reads `google_data_last_refreshed_at`. If null OR older than the smallest relevant TTL for the requested fields, re-fetch and update row. `route_legs` cache: hour-bucketed (existing schema).
+Inside `finalizeTripDraft`, after trip insert:
+- Determine day count: explicit dates → `differenceInCalendarDays + 1`; duration-only → `duration_days`; missing → 0 (no shells, dashboard prompt shown).
+- For each day, insert `itinerary_days` row with `day_number`, `date` (or null if flexible), `prompt`:
+  - Day 1: "Arrival & settle in" — link to arrival flight if present.
+  - Day N (last): "Departure" — link to outbound if present.
+  - Middle days: round-robin assign planned_places as area labels; prompt = "Explore near {place}" or fallback prompts.
+- `is_placeholder = true` so dashboard can style/replace later.
 
-## Error handling
-Every server fn returns `{ data, error: string|null }` shape. Components hide Google-dependent UI on null. Map renders fallback box on script load failure.
+This is intentionally simple; AI enrichment is a later phase.
 
-## Out of scope (per your spec)
-- Onboarding flow changes
-- Third-party flight API
-- Mapbox-equivalent live-location avatar pulse (will be re-implemented atop GoogleMap in Phase 2)
+## 8. Dashboard prompts for skipped steps
 
----
+`src/components/dashboard/SetupPrompts.tsx` (new) — queries trip/profile and renders dismissible cards:
+- No `marker_colour` or `uploaded_avatar_url` → "Add your profile photo and colour".
+- 0 stays → "Add your stay to unlock route planning".
+- 0 planned_places → "Add places you want to visit".
+- No flights and no manual arrival → "Add arrival details so your crew knows when you land".
+- `dates_flexible = true` → "Lock in exact dates when you're ready".
 
-## Acceptance checkpoints
-- After Phase 1: server fns callable, migration applied, no UI change.
-- After Phase 2: maps render in all 3 places, no console errors.
-- After Phase 3: cards show ratings, detail drawer shows reviews/map/hours.
-- After Phase 4: accommodation autocomplete works, admin can attach place IDs.
-- After Phase 5: zero mapbox-gl imports.
+Slot it at top of `/dashboard` above existing content. Dismissed state in localStorage per user.
 
-**Estimated files touched**: ~30 (Phase 1: migration + 3 files; Phase 2: 1 new + 3 replacements; Phase 3: 4 routes/components; Phase 4: 3 new + 2 modified; Phase 5: 5 deletions).
+## 9. Risks & breakage to watch
 
-Approve and I'll execute Phase 1 immediately, then pause for the browser key before Phase 2.
+- `trips.start_date` / `end_date` becoming nullable affects every read in `trip.functions.ts`, `discover.functions.ts`, `recommend.functions.ts`, dashboard, agenda, week calendar. Need a pass to coalesce to `null` and render "Dates TBD" + use `duration_days` as fallback.
+- Existing `/start` route still referenced from `login.tsx`, `choose.tsx`, `WhatsAppDialog.tsx`. Update redirects to `/plan` (invite param → `/plan/auth?invite=...`).
+- `itinerary_days` may already have rows for legacy trips — additive columns only, safe.
+- `accommodations` already supports multi-stay; no migration needed there, just UI.
+- RLS on `planned_places` uses `current_user_trip_id()` — works for crew model.
+- Storage bucket policies: writes scoped to `auth.uid()` folder; reads public.
+- `handle_new_user` trigger change must be backward compatible (use `coalesce`).
+
+## 10. Implementation phases (deliverable order)
+
+1. **Migration + draft store + `/plan` shell + redirect from `/start`** — no UX regression, foundation in place.
+2. **Destination + Dates/Duration steps** with new visual language.
+3. **Places on radar step** + `planned_places` writes.
+4. **Multi-stay step** + dashboard pin updates.
+5. **Optional arrival step** (Jetstar-style, AviationStack soft-enrich).
+6. **Profile step** (Google photo / upload + marker colour) + remove `AvatarPicker`.
+7. **Finalize server fn + starter day-shell generator + `/plan/ready`**.
+8. **Dashboard `SetupPrompts`** + coalesce nullable dates across reads.
+9. Cleanup: delete deprecated `/start` wizard once `/plan` is stable.
+
+## 11. Acceptance check (mapping to your criteria)
+
+- Landing untouched ✅ (no edits to `index.tsx`).
+- Account before save, draft survives login ✅ (Zustand + localStorage + Google redirect).
+- Google profile photo + marker colour, no generated avatars ✅.
+- Destination required, Places-first ✅.
+- Dates OR duration ✅ (schema + UI).
+- Multi planned places ✅ (new table).
+- Multi stays, Places-first, shared by default ✅ (already crew-visible via trip_id).
+- Flights de-emphasised + optional + manual fallback ✅.
+- Vibe optional ✅.
+- Starter day shells generated ✅.
+- Skipped → dashboard prompts ✅.
+- Invite flow preserved ✅ (`/start?invite=` redirect).
+- Existing maps/discover/itinerary/chat untouched (only additive schema + new routes).
+
+Ready to switch to build mode and start with Phase 1 (migration + shell). I'll pause after the migration for your approval before continuing.

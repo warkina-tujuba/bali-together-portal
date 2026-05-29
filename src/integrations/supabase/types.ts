@@ -579,6 +579,8 @@ export type Database = {
           created_at: string
           day_date: string
           id: string
+          is_placeholder: boolean
+          prompt: string | null
           sort_index: number
           summary: string | null
           title: string
@@ -589,6 +591,8 @@ export type Database = {
           created_at?: string
           day_date: string
           id?: string
+          is_placeholder?: boolean
+          prompt?: string | null
           sort_index?: number
           summary?: string | null
           title: string
@@ -599,6 +603,8 @@ export type Database = {
           created_at?: string
           day_date?: string
           id?: string
+          is_placeholder?: boolean
+          prompt?: string | null
           sort_index?: number
           summary?: string | null
           title?: string
@@ -701,14 +707,76 @@ export type Database = {
         }
         Relationships: []
       }
+      planned_places: {
+        Row: {
+          address: string | null
+          created_at: string
+          created_by: string
+          end_date: string | null
+          google_place_id: string | null
+          id: string
+          lat: number | null
+          lng: number | null
+          name: string
+          nights: number | null
+          sort_index: number
+          source: string
+          start_date: string | null
+          trip_id: string
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          created_by: string
+          end_date?: string | null
+          google_place_id?: string | null
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          name: string
+          nights?: number | null
+          sort_index?: number
+          source?: string
+          start_date?: string | null
+          trip_id: string
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          created_by?: string
+          end_date?: string | null
+          google_place_id?: string | null
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          name?: string
+          nights?: number | null
+          sort_index?: number
+          source?: string
+          start_date?: string | null
+          trip_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planned_places_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
+          auth_provider: string | null
           avatar_url: string | null
           created_at: string
           dietary: string | null
           email: string | null
           full_name: string | null
+          google_avatar_url: string | null
           id: string
+          marker_colour: string | null
           notes: string | null
           onboarding_complete: boolean
           onboarding_step: number
@@ -716,15 +784,19 @@ export type Database = {
           room_preference: string | null
           trip_id: string | null
           updated_at: string
+          uploaded_avatar_url: string | null
           whatsapp_joined_at: string | null
         }
         Insert: {
+          auth_provider?: string | null
           avatar_url?: string | null
           created_at?: string
           dietary?: string | null
           email?: string | null
           full_name?: string | null
+          google_avatar_url?: string | null
           id: string
+          marker_colour?: string | null
           notes?: string | null
           onboarding_complete?: boolean
           onboarding_step?: number
@@ -732,15 +804,19 @@ export type Database = {
           room_preference?: string | null
           trip_id?: string | null
           updated_at?: string
+          uploaded_avatar_url?: string | null
           whatsapp_joined_at?: string | null
         }
         Update: {
+          auth_provider?: string | null
           avatar_url?: string | null
           created_at?: string
           dietary?: string | null
           email?: string | null
           full_name?: string | null
+          google_avatar_url?: string | null
           id?: string
+          marker_colour?: string | null
           notes?: string | null
           onboarding_complete?: boolean
           onboarding_step?: number
@@ -748,6 +824,7 @@ export type Database = {
           room_preference?: string | null
           trip_id?: string | null
           updated_at?: string
+          uploaded_avatar_url?: string | null
           whatsapp_joined_at?: string | null
         }
         Relationships: [
@@ -875,9 +952,17 @@ export type Database = {
         Row: {
           cover_image_url: string | null
           created_at: string
+          dates_flexible: boolean
           description: string | null
           destination: string
-          end_date: string
+          destination_country: string | null
+          destination_google_maps_url: string | null
+          destination_lat: number | null
+          destination_lng: number | null
+          destination_place_id: string | null
+          duration_days: number | null
+          duration_nights: number | null
+          end_date: string | null
           id: string
           is_active: boolean
           join_code: string | null
@@ -886,16 +971,24 @@ export type Database = {
           map_default_zoom: number | null
           name: string
           occasion: string | null
-          start_date: string
+          start_date: string | null
           updated_at: string
           whatsapp_invite_url: string | null
         }
         Insert: {
           cover_image_url?: string | null
           created_at?: string
+          dates_flexible?: boolean
           description?: string | null
           destination: string
-          end_date: string
+          destination_country?: string | null
+          destination_google_maps_url?: string | null
+          destination_lat?: number | null
+          destination_lng?: number | null
+          destination_place_id?: string | null
+          duration_days?: number | null
+          duration_nights?: number | null
+          end_date?: string | null
           id?: string
           is_active?: boolean
           join_code?: string | null
@@ -904,16 +997,24 @@ export type Database = {
           map_default_zoom?: number | null
           name: string
           occasion?: string | null
-          start_date: string
+          start_date?: string | null
           updated_at?: string
           whatsapp_invite_url?: string | null
         }
         Update: {
           cover_image_url?: string | null
           created_at?: string
+          dates_flexible?: boolean
           description?: string | null
           destination?: string
-          end_date?: string
+          destination_country?: string | null
+          destination_google_maps_url?: string | null
+          destination_lat?: number | null
+          destination_lng?: number | null
+          destination_place_id?: string | null
+          duration_days?: number | null
+          duration_nights?: number | null
+          end_date?: string | null
           id?: string
           is_active?: boolean
           join_code?: string | null
@@ -922,7 +1023,7 @@ export type Database = {
           map_default_zoom?: number | null
           name?: string
           occasion?: string | null
-          start_date?: string
+          start_date?: string | null
           updated_at?: string
           whatsapp_invite_url?: string | null
         }
