@@ -20,7 +20,7 @@ type Suggestion = {
   full_text: string;
 };
 
-const RECENT_KEY = "tl_recent_places_v2";
+const RECENT_KEY = "tl_recent_places_v3";
 function readRecent(): PlaceHit[] {
   try { return JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]"); } catch { return []; }
 }
