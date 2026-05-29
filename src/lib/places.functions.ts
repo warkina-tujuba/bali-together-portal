@@ -81,14 +81,13 @@ export const getPlaceDetails = createServerFn({ method: "POST" })
     const payload = rawToCache(data.placeId, raw);
     if (data.table && data.rowId) {
       const updateBody: Record<string, unknown> = { ...payload };
-      // Only update lat/lng if row didn't have them
       if (data.table === "activities" || data.table === "activity_seeds") {
-        // leave lat/lng update conditional in DB layer; safest: just set if missing
         const { data: existing } = await supabaseAdmin.from(data.table).select("lat, lng").eq("id", data.rowId).maybeSingle();
         if (existing?.lat != null) delete updateBody.lat;
         if (existing?.lng != null) delete updateBody.lng;
       }
-      await supabaseAdmin.from(data.table).update(updateBody).eq("id", data.rowId);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await supabaseAdmin.from(data.table).update(updateBody as any).eq("id", data.rowId);
     }
     return { cached: false, data: payload };
   });
