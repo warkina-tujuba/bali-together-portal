@@ -68,23 +68,34 @@ export const listDiscover = createServerFn({ method: "POST" })
       .limit(200);
 
     const near = data.near ?? stayCenter;
-    let items: SeedCard[] = (seeds ?? []).map((s) => ({
-      id: s.id,
-      title: s.title,
-      description: s.description,
-      category: s.category,
-      tags: (s.tags as string[] | null) ?? [],
-      image_url: s.image_url,
-      url: s.url,
-      est_cost_usd: s.est_cost_usd as number | null,
-      est_duration_min: s.est_duration_min,
-      lat: s.lat,
-      lng: s.lng,
-      rating: (s.rating as number | null) ?? null,
-      review_count: s.review_count ?? 0,
-      price_band: s.price_band ?? 2,
-      distance_km: near && s.lat != null && s.lng != null ? haversineKm(near, { lat: s.lat, lng: s.lng }) : null,
-    }));
+    let items: SeedCard[] = (seeds ?? []).map((s) => {
+      const cachedPhoto = (s as { cached_google_photo_url?: string | null }).cached_google_photo_url ?? null;
+      const cachedRating = (s as { cached_google_rating?: number | null }).cached_google_rating ?? null;
+      const cachedReviewCount = (s as { cached_google_review_count?: number | null }).cached_google_review_count ?? null;
+      const cachedAddress = (s as { cached_google_address?: string | null }).cached_google_address ?? null;
+      const placeId = (s as { google_place_id?: string | null }).google_place_id ?? null;
+      const mapsUrl = (s as { google_maps_url?: string | null }).google_maps_url ?? null;
+      return {
+        id: s.id,
+        title: s.title,
+        description: s.description,
+        category: s.category,
+        tags: (s.tags as string[] | null) ?? [],
+        image_url: cachedPhoto ?? s.image_url,
+        url: s.url,
+        est_cost_usd: s.est_cost_usd as number | null,
+        est_duration_min: s.est_duration_min,
+        lat: s.lat,
+        lng: s.lng,
+        rating: cachedRating ?? ((s.rating as number | null) ?? null),
+        review_count: cachedReviewCount ?? s.review_count ?? 0,
+        price_band: s.price_band ?? 2,
+        distance_km: near && s.lat != null && s.lng != null ? haversineKm(near, { lat: s.lat, lng: s.lng }) : null,
+        google_place_id: placeId,
+        google_maps_url: mapsUrl,
+        google_address: cachedAddress,
+      };
+    });
 
     if (data.query) {
       const q = data.query.toLowerCase();
