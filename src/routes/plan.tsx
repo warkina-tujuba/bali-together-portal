@@ -59,9 +59,12 @@ function PlanSearch() {
   const [children, setChildren] = useState(0);
   const [infants, setInfants] = useState(0);
 
-  const range: DateRange | undefined = draft.start_date
-    ? { from: new Date(draft.start_date), to: draft.end_date ? new Date(draft.end_date) : undefined }
-    : undefined;
+  const range = useMemo<DateRange | undefined>(() => {
+    if (!draft.start_date) return undefined;
+    const from = parseISO(draft.start_date + "T00:00:00");
+    const to = draft.end_date ? parseISO(draft.end_date + "T00:00:00") : undefined;
+    return { from, to };
+  }, [draft.start_date, draft.end_date]);
 
   const dateLabel = useMemo(() => {
     if (!draft.start_date) return "When?";
