@@ -188,14 +188,35 @@ function Landing() {
         </div>
 
         <Reveal>
-          <div className="mt-20 flex flex-col items-center gap-5 text-center sm:mt-24">
-            <p className="font-display text-3xl sm:text-5xl">Ready when your crew is.</p>
-            <Link
-              to="/plan"
-              className="inline-flex h-12 items-center gap-2 rounded-full bg-accent px-8 text-sm font-medium uppercase tracking-[0.2em] text-accent-foreground transition hover:bg-accent/90"
-            >
-              Plan your trip <ArrowRight className="h-4 w-4" />
-            </Link>
+          <div className="mt-16 flex flex-col items-center gap-6 text-center sm:mt-20">
+            <p className="font-display text-2xl sm:text-4xl">Ready when your crew is.</p>
+            <div className="w-full max-w-sm space-y-3">
+              <ActionCard
+                tone="dark"
+                label="New trip"
+                emoji="🗺️"
+                onClick={() => navigate({ to: "/plan" })}
+                delay={0}
+              />
+              <ActionCard
+                tone="light"
+                label="Find trip"
+                emoji="🔍"
+                onClick={() => {
+                  const el = document.getElementById("invite-input");
+                  el?.scrollIntoView({ behavior: "smooth", block: "center" });
+                  setTimeout(() => el?.focus(), 350);
+                }}
+                delay={0.06}
+              />
+              <ActionCard
+                tone="light"
+                label="Add spots"
+                emoji="📍"
+                onClick={() => navigate({ to: "/plan" })}
+                delay={0.12}
+              />
+            </div>
           </div>
         </Reveal>
       </Section>
