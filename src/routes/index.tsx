@@ -88,43 +88,57 @@ function Landing() {
             From Bali to Tokyo to Lisbon, plan your trip with confidence. Drop one link for your party to join — everyone lands in the same private portal, ready to go.
           </motion.p>
 
-          {/* CTA card — compact on mobile */}
+          {/* Chunky action stack — onboarding-style cards */}
           <motion.div
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.32 }}
-            className="mt-7 w-full max-w-md sm:mt-9"
+            className="mt-7 w-full max-w-sm sm:mt-9"
           >
-            <div className="rounded-2xl border border-white/10 bg-white/95 p-4 text-left text-foreground shadow-card backdrop-blur sm:rounded-3xl sm:p-5">
+            <div className="space-y-3">
+              <ActionCard
+                tone="dark"
+                label="New trip"
+                emoji="🗺️"
+                onClick={() => navigate({ to: "/plan" })}
+                delay={0}
+              />
+              <ActionCard
+                tone="light"
+                label="Find trip"
+                emoji="🔍"
+                onClick={() => {
+                  const el = document.getElementById("invite-row");
+                  el?.scrollIntoView({ behavior: "smooth", block: "center" });
+                  setTimeout(() => document.getElementById("invite-input")?.focus(), 350);
+                }}
+                delay={0.06}
+              />
+              <ActionCard
+                tone="light"
+                label="Add spots"
+                emoji="📍"
+                onClick={() => navigate({ to: "/plan" })}
+                delay={0.12}
+              />
+            </div>
+
+            <div id="invite-row" className="mt-5 flex items-center gap-2">
+              <Input
+                id="invite-input"
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+                placeholder="paste an invite code"
+                className="h-11 rounded-full border-white/20 bg-white/10 px-4 text-sm text-white placeholder:text-white/60 backdrop-blur focus-visible:ring-white/40"
+              />
               <Button
                 size="lg"
-                className="h-12 w-full rounded-xl bg-accent text-base font-semibold uppercase tracking-wider text-accent-foreground hover:bg-accent/90 sm:h-14"
-                onClick={() => navigate({ to: "/plan" })}
+                className="h-11 rounded-full bg-white px-5 text-foreground hover:bg-white/90"
+                onClick={() => navigate({ to: "/plan", search: { invite: token } })}
+                disabled={!token.trim()}
               >
-                Plan your trip <ArrowRight className="h-4 w-4" />
+                Enter
               </Button>
-
-              <div className="mt-4 flex items-center gap-3 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                <span className="h-px flex-1 bg-border" /> Got a magic link? <span className="h-px flex-1 bg-border" />
-              </div>
-
-              <div className="mt-3 flex gap-2">
-                <Input
-                  value={token}
-                  onChange={(e) => setToken(e.target.value)}
-                  placeholder="paste your invite code"
-                  className="h-11 rounded-xl text-sm"
-                />
-                <Button
-                  size="lg"
-                  variant="secondary"
-                  className="h-11 rounded-xl px-4"
-                  onClick={() => navigate({ to: "/plan", search: { invite: token } })}
-                  disabled={!token.trim()}
-                >
-                  Enter
-                </Button>
-              </div>
             </div>
           </motion.div>
         </div>
@@ -239,5 +253,43 @@ function Reveal({ children, delay = 0 }: { children: React.ReactNode; delay?: nu
     >
       {children}
     </motion.div>
+  );
+}
+
+function ActionCard({
+  tone, label, emoji, onClick, delay = 0,
+}: {
+  tone: "dark" | "light";
+  label: string;
+  emoji: string;
+  onClick: () => void;
+  delay?: number;
+}) {
+  const isDark = tone === "dark";
+  return (
+    <motion.button
+      type="button"
+      onClick={onClick}
+      initial={{ opacity: 0, y: 14, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.55, delay: 0.34 + delay, ease: [0.22, 1, 0.36, 1] }}
+      whileHover={{ y: -2 }}
+      whileTap={{ scale: 0.98 }}
+      className={`group relative flex w-full items-center justify-between overflow-hidden rounded-[28px] px-6 py-5 text-left shadow-[0_10px_30px_-12px_rgba(0,0,0,0.45)] backdrop-blur transition ${
+        isDark
+          ? "bg-[color:rgb(20_20_24/0.92)] text-white"
+          : "bg-white/95 text-foreground"
+      }`}
+    >
+      <span className="font-display text-2xl leading-none sm:text-3xl">{label}</span>
+      <span
+        className={`grid h-12 w-12 place-items-center rounded-2xl text-2xl transition-transform group-hover:rotate-[-6deg] group-hover:scale-110 ${
+          isDark ? "bg-white/10" : "bg-foreground/5"
+        }`}
+        aria-hidden
+      >
+        {emoji}
+      </span>
+    </motion.button>
   );
 }
