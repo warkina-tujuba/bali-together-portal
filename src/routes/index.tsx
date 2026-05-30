@@ -4,7 +4,7 @@ import { motion, useScroll, useTransform } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { z } from "zod";
-import { Sparkles, MessageCircle, MapPin, Plane, CalendarDays, ArrowRight } from "lucide-react";
+import { Sparkles, MessageCircle, MapPin, Plane, CalendarDays } from "lucide-react";
 import logo from "@/assets/logo.png";
 import { LocationMarquee } from "@/components/home/LocationMarquee";
 
