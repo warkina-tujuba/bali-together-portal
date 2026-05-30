@@ -255,3 +255,41 @@ function Reveal({ children, delay = 0 }: { children: React.ReactNode; delay?: nu
     </motion.div>
   );
 }
+
+function ActionCard({
+  tone, label, emoji, onClick, delay = 0,
+}: {
+  tone: "dark" | "light";
+  label: string;
+  emoji: string;
+  onClick: () => void;
+  delay?: number;
+}) {
+  const isDark = tone === "dark";
+  return (
+    <motion.button
+      type="button"
+      onClick={onClick}
+      initial={{ opacity: 0, y: 14, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.55, delay: 0.34 + delay, ease: [0.22, 1, 0.36, 1] }}
+      whileHover={{ y: -2 }}
+      whileTap={{ scale: 0.98 }}
+      className={`group relative flex w-full items-center justify-between overflow-hidden rounded-[28px] px-6 py-5 text-left shadow-[0_10px_30px_-12px_rgba(0,0,0,0.45)] backdrop-blur transition ${
+        isDark
+          ? "bg-[color:rgb(20_20_24/0.92)] text-white"
+          : "bg-white/95 text-foreground"
+      }`}
+    >
+      <span className="font-display text-2xl leading-none sm:text-3xl">{label}</span>
+      <span
+        className={`grid h-12 w-12 place-items-center rounded-2xl text-2xl transition-transform group-hover:rotate-[-6deg] group-hover:scale-110 ${
+          isDark ? "bg-white/10" : "bg-foreground/5"
+        }`}
+        aria-hidden
+      >
+        {emoji}
+      </span>
+    </motion.button>
+  );
+}
