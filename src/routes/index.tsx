@@ -88,52 +88,38 @@ function Landing() {
             From Bali to Tokyo to Lisbon, plan your trip with confidence. Drop one link for your party to join — everyone lands in the same private portal, ready to go.
           </motion.p>
 
-          {/* Chunky action stack — onboarding-style cards */}
+          {/* Hero CTA */}
           <motion.div
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.32 }}
             className="mt-7 w-full max-w-sm sm:mt-9"
           >
-            <div className="space-y-3">
-              <ActionCard
-                tone="dark"
-                label="New trip"
-                emoji="🗺️"
-                onClick={() => navigate({ to: "/plan" })}
-                delay={0}
-              />
-              <ActionCard
-                tone="light"
-                label="Find trip"
-                emoji="🔍"
-                onClick={() => {
-                  const el = document.getElementById("invite-row");
-                  el?.scrollIntoView({ behavior: "smooth", block: "center" });
-                  setTimeout(() => document.getElementById("invite-input")?.focus(), 350);
-                }}
-                delay={0.06}
-              />
-              <ActionCard
-                tone="light"
-                label="Add spots"
-                emoji="📍"
-                onClick={() => navigate({ to: "/plan" })}
-                delay={0.12}
-              />
+            <Button
+              size="lg"
+              className="h-12 w-full rounded-full bg-white px-8 text-sm font-medium uppercase tracking-[0.2em] text-foreground transition hover:bg-white/90"
+              onClick={() => navigate({ to: "/plan" })}
+            >
+              Start planning
+            </Button>
+
+            <div className="mt-4 flex items-center gap-3">
+              <div className="h-px flex-1 bg-white/20" />
+              <span className="text-xs text-white/60">or</span>
+              <div className="h-px flex-1 bg-white/20" />
             </div>
 
-            <div id="invite-row" className="mt-5 flex items-center gap-2">
+            <div className="mt-4 flex items-center gap-2">
               <Input
                 id="invite-input"
                 value={token}
                 onChange={(e) => setToken(e.target.value)}
-                placeholder="paste an invite code"
+                placeholder="Paste an invite code"
                 className="h-11 rounded-full border-white/20 bg-white/10 px-4 text-sm text-white placeholder:text-white/60 backdrop-blur focus-visible:ring-white/40"
               />
               <Button
                 size="lg"
-                className="h-11 rounded-full bg-white px-5 text-foreground hover:bg-white/90"
+                className="h-11 rounded-full bg-white/15 px-5 text-white hover:bg-white/25 backdrop-blur"
                 onClick={() => navigate({ to: "/plan", search: { invite: token } })}
                 disabled={!token.trim()}
               >
